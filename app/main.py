@@ -8,6 +8,9 @@ import socket
 import bencodepy
 import math
 import os
+from urllib.parse import unquote
+import threading
+import concurrent.futures
 
 def decode_bencode(bencoded_value):
     return bencode.decode(bencoded_value)
@@ -67,11 +70,11 @@ def handshake(info_hash, Ssocket, peer_id, ip, port):
 
 
 def receive_message(s):
+
     length = s.recv(4)
     while not length or not int.from_bytes(length):
         length = s.recv(4)
     message = s.recv(int.from_bytes(length))
-    
     while len(message) < int.from_bytes(length):
         message += s.recv(int.from_bytes(length) - len(message))
     return length + message
@@ -79,13 +82,14 @@ def receive_message(s):
 
 
 def download_piece(tracker_url, length, info_hash, pieces, piece_length, peer_id, peer_index, output):
-
-    list_peers = get_list_peers(tracker_url, info_hash, peer_id, 6881, 0, 0, length, 1)
-
-    ip, port = list_peers[0]
+    # print("aaaaaaaaaaaaaaaaaaaa", tracker_url, info_hash.hex(), peer_id, 6881, 0, 0, length, 1)
+    # list_peers = get_list_peers(tracker_url, info_hash, peer_id, 6881, 0, 0, length, 1)
+    # ip, port = list_peers[0]
+    ip = '192.168.1.9'
+    port = 6881
+    print(ip, port)
     sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
     
-
     payload = (
         b"\x13BitTorrent protocol\x00\x00\x00\x00\x00\x00\x00\x00"
         + info_hash
@@ -97,24 +101,23 @@ def download_piece(tracker_url, length, info_hash, pieces, piece_length, peer_id
         sock.connect((ip, port))
         sock.sendall(payload)
         response = sock.recv(68)
-
-        # response = handshake(info_hash, sock, peer_id, ip, port)
-        message = receive_message(sock)
         
+        message = receive_message(sock)
+        print(message)
         while int(message[4]) != 5:
-            print("aaaa")
+            print("zzz")
             message = receive_message(sock)
         
 
         interested_payload = struct.pack(">IB", 1, 2)
+        print(interested_payload)
         sock.sendall(interested_payload)
         
-        # sock.settimeout(3)
+        sock.settimeout(3)
         
         message = receive_message(sock)
 
         while int(message[4]) != 1:
-            print("bbb")
             message =receive_message(sock)
 
         list_piece_hashs = get_list_piece_hashs(pieces)
@@ -133,14 +136,6 @@ def download_piece(tracker_url, length, info_hash, pieces, piece_length, peer_id
             print(f"request block {i+1} of {num_blocks} with len {block_length}")
 
             request_payload = struct.pack(">IBIII", 13, 6, peer_index, block_start, block_length)
-            # print("Requesting block, with payload:")
-            # print(request_payload)
-            # print(struct.unpack(">IBIII", request_payload))
-            # print(int.from_bytes(request_payload[:4]))
-            # print(int.from_bytes(request_payload[4:5]))
-            # print(int.from_bytes(request_payload[5:9]))
-            # print(int.from_bytes(request_payload[9:13]))
-            # print(int.from_bytes(request_payload[13:17]))
 
             sock.sendall(request_payload)
             message = receive_message(sock)
@@ -165,6 +160,136 @@ def download(torrent_file, output):
     for i in range(num_piece):
         download_piece(tracker_url, length, info_hash, pieces, piece_length, "01234567899876543210", i, output)
     return True
+
+
+def extract_magnet_link(magnet_link):
+    query_params = magnet_link[8:].split("&")
+    params = dict()
+    for p in query_params:
+        key, value = p.split("=")
+        params[key] = value
+    info_hash = params["xt"][9:]
+    tracker_url = unquote(params["tr"])
+    return tracker_url, info_hash
+
+
+def upload_piece_by_piece(torrent_file, file_path, peer_id="01234567899876543211", port=6881):
+
+    tracker_url, length, info_hash, pieces, piece_length = get_info(torrent_file)
+    
+    server_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+    server_socket.bind(("", port))
+    server_socket.listen(5)
+    print(f"Đang lắng nghe kết nối trên cổng {port}...")
+
+    def handle_peer_connection(client_socket, address):
+        try:
+            print(f"Kết nối với peer: {address}")
+
+            peer_handshake = client_socket.recv(68)
+            print(peer_handshake)
+            if peer_handshake[28:48] != info_hash:
+                print("Info hash không khớp; đóng kết nối")
+                client_socket.close()
+                return
+
+            # Gửi lại Handshake với thông điệp `bitfield`
+            handshake_response = (
+                b"\x13BitTorrent protocol\x00\x00\x00\x00\x00\x00\x00\x00" +
+                info_hash +
+                peer_id.encode()
+            )
+            client_socket.sendall(handshake_response)
+
+
+            num_pieces = len(get_list_piece_hashs(pieces))
+            bitfield = bytearray(math.ceil(num_pieces / 8))
+            for i in range(num_pieces):
+                byte_index = i // 8
+                bit_index = 7 - (i % 8)
+                bitfield[byte_index] |= (1 << bit_index)
+
+
+            bitfield_msg = struct.pack(">IB", len(bitfield) + 1, 5) + bitfield
+            client_socket.sendall(bitfield_msg)
+            
+            while True:
+                message = receive_message(client_socket)
+                if message is None:
+                    break
+
+                message_id = message[4]
+                if message_id == 2:
+                    print("Nhận được thông điệp 'interested' từ peer")
+                    unchoke_msg = struct.pack(">IB", 1, 1)
+                    client_socket.sendall(unchoke_msg)
+                elif message_id == 6:
+                    index, offset, length = struct.unpack(">III", message[5:17])
+                    piece_start = index * piece_length + offset
+                    with open(file_path, "rb") as f:
+                        f.seek(piece_start)
+                        data_to_send = f.read(length)
+                    piece_msg = struct.pack(">IBII", 9 + len(data_to_send), 7, index, offset) + data_to_send
+                    client_socket.sendall(piece_msg)
+                    print(f"send {index} offset {offset} length {length} to peer {address}")
+                else:
+                    print(f"Nhận được thông điệp không xác định với ID: {message_id}")
+
+        except Exception as e:
+            print(f"Lỗi với peer {address}: {e}")
+        finally:
+            client_socket.close()
+            print(f"Kết nối với peer {address} đã đóng")
+
+
+    try:
+        while True:
+            client_socket, address = server_socket.accept()
+            peer_thread = threading.Thread(target=handle_peer_connection, args=(client_socket, address))
+            peer_thread.start()
+    except KeyboardInterrupt:
+        print("Dừng server upload.")
+    finally:
+        server_socket.close()
+
+
+
+
+def get_piece_hashes(file_path, piece_length):
+
+    piece_hashes = b""
+    with open(file_path, "rb") as f:
+        while True:
+            piece = f.read(piece_length)
+            if not piece:
+                break
+            piece_hash = hashlib.sha1(piece).digest()
+            piece_hashes += piece_hash
+    return piece_hashes
+
+def create_torrent(file_path, tracker_url, piece_length=512*1024):
+ 
+    file_name = os.path.basename(file_path)
+    file_size = os.path.getsize(file_path)
+    piece_hashes = get_piece_hashes(file_path, piece_length)
+    print(tracker_url, file_name, file_size, piece_length, piece_hashes)
+    torrent_info = {
+        "announce": tracker_url,
+        "info": {
+            "name": file_name,
+            "length": file_size,
+            "piece length": piece_length,
+            "pieces": piece_hashes,
+        }
+    }
+
+    torrent_file_path = f"{file_name}.torrent"
+    with open(torrent_file_path, "wb") as torrent_file:
+        torrent_file.write(bencodepy.encode(torrent_info))
+
+
+    print(f"Torrent file created: {torrent_file_path}")
+    return torrent_file_path
 
 
 def main():
@@ -239,6 +364,24 @@ def main():
         if download(torrent_file, output):
             print(f"download {torrent_file} to {output}")
 
+
+    elif command == "magnet_parse":
+        magnet_link = sys.argv[2]
+        tracker_url, info_hash = extract_magnet_link(magnet_link)
+
+        print(f"Tracker URL: {tracker_url}")
+        print(f"Info Hash: {info_hash}")
+
+    elif command == "upload":
+        torrent_file = sys.argv[2]
+        file_path = sys.argv[3]
+        upload_piece_by_piece(torrent_file, file_path, peer_id="01234567899876543210", port=6881)
+        pass
+
+    elif command == "create_torrent":
+        file_path = sys.argv[2]
+        tracker_url = sys.argv[3]
+        create_torrent(file_path, tracker_url)
 
     else:
         raise NotImplementedError(f"Unknown command {command}")
