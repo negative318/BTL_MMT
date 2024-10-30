@@ -83,10 +83,10 @@ def receive_message(s):
 
 def download_piece(tracker_url, length, info_hash, pieces, piece_length, peer_id, peer_index, output):
     # print("aaaaaaaaaaaaaaaaaaaa", tracker_url, info_hash.hex(), peer_id, 6881, 0, 0, length, 1)
-    # list_peers = get_list_peers(tracker_url, info_hash, peer_id, 6881, 0, 0, length, 1)
-    # ip, port = list_peers[0]
-    ip = '192.168.1.9'
-    port = 6881
+    list_peers = get_list_peers(tracker_url, info_hash, peer_id, 6881, 0, 0, length, 1)
+    ip, port = list_peers[0]
+    # ip = '192.168.1.9'
+    # port = 6881
     print(ip, port)
     sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
     
