@@ -75,10 +75,15 @@ def register():
     return render_template('register.html')
 
 
-@app.route('/index')
+@app.route('/index', methods=['GET', 'POST'])
 @login_required
 def index():
-    return render_template('index.html')  
+    search_results = []
+    if request.method == 'POST':
+        search_query = request.form.get('search_query')  
+        search_results = search_files(search_query)  
+    return render_template('index.html', search_results=search_results)
+
 
 
 @app.route('/logout')
@@ -91,6 +96,31 @@ def logout():
 @login_required
 def user_details():
     return render_template('user_details.html', user=current_user)
+
+"""
+@app.route('/connect_to_all_peers_and_download/<filename>', methods=['GET'])
+def connect_to_all_peers_and_download(filename):
+    torrent_file = os.path.join('path_to_torrent_files', filename)  # Đường dẫn tới file torrent
+    output_file = os.path.join('path_to_output_files', 'downloaded_file')  # Đường dẫn lưu file tải về
+
+    # Gọi hàm download từ main.py để tải file từ tất cả các peer
+    try:
+        success = download(torrent_file, output_file)  # Thực hiện tải xuống
+
+        if success:
+            # Trả file đã tải xuống cho người dùng
+            return send_file(output_file, as_attachment=True)
+        else:
+            return "Failed to download the file from peers.", 500
+    except Exception as e:
+        print(f"Error: {e}")
+        return "An error occurred during download.", 500
+"""
+
+def search_files(query):
+    files = ["file1.txt", "file2.txt", "file3.txt"]  
+    results = [file for file in files if query.lower() in file.lower()]
+    return results
 
 
 if __name__ == "__main__":
