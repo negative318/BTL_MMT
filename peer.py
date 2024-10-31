@@ -80,103 +80,21 @@ def receive_message(s):
         message += s.recv(int.from_bytes(length) - len(message))
     return length + message
 
-# def download_piece(tracker_url, length, info_hash, pieces, piece_length, peer_id, peer_index, output):
-#     # print("aaaaaaaaaaaaaaaaaaaa", tracker_url, info_hash.hex(), peer_id, 6881, 0, 0, length, 1)
-#         # list_peers = get_list_peers(tracker_url, info_hash, peer_id, 6881, 0, 0, length, 1)
-#         # ip, port = list_peers[0]
-#     ip = '192.168.150.190'
-#     port = 6881
-#     print(ip, port)
-#     sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-    
-#     payload = (
-#         b"\x13BitTorrent protocol\x00\x00\x00\x00\x00\x00\x00\x00"
-#         + info_hash
-#         + peer_id.encode()
-#     )
-
-
-#     try:
-#         sock.connect((ip, port))
-#         sock.sendall(payload)
-#         response = sock.recv(68)
-        
-#         message = receive_message(sock)
-#         print(message)
-#         while int(message[4]) != 5:
-#             message = receive_message(sock)
-        
-
-#         interested_payload = struct.pack(">IB", 1, 2)
-#         print(interested_payload)
-#         sock.sendall(interested_payload)
-        
-#         sock.settimeout(3)
-        
-#         message = receive_message(sock)
-
-#         while int(message[4]) != 1:
-#             message =receive_message(sock)
-
-#         list_piece_hashs = get_list_piece_hashs(pieces)
-#         num_peers = len(list_piece_hashs)
-
-#         if peer_index == num_peers - 1:
-#             piece_length = length - piece_length * peer_index
-        
-#         num_blocks = math.ceil(piece_length / (16*1024))
-
-#         data = bytearray()
-
-#         for i in range(num_blocks):
-#             block_start = 16 * 1024 * i
-#             block_length = min(piece_length - block_start, 16*1024)
-#             print(f"request block {i+1} of {num_blocks} with len {block_length}")
-
-#             request_payload = struct.pack(">IBIII", 13, 6, peer_index, block_start, block_length)
-
-#             sock.sendall(request_payload)
-#             message = receive_message(sock)
-#             data.extend(message[13:])
-        
-#         with open(output, "ab") as f:
-#             f.write(data)
-#         print("end file")
-#         data.clear()
-
-#     finally:
-#         print("close socket")
-#         sock.close()
-
-#     return True
-
-# def download(torrent_file, output):
-
-#     tracker_url, length, info_hash, pieces, piece_length = get_info(torrent_file)
-#     num_piece = len(get_list_piece_hashs(pieces))
-#     for i in range(num_piece):
-#         download_piece(tracker_url, length, info_hash, pieces, piece_length, "01234567899876543210", i, output)
-#     return True
-
-
-
-
-
-def download_piece(tracker_url, length, info_hash, pieces, piece_length, peer_id, peer_index):
-
+def download_piece(tracker_url, length, info_hash, pieces, piece_length, peer_id, peer_index, output):
     # print("aaaaaaaaaaaaaaaaaaaa", tracker_url, info_hash.hex(), peer_id, 6881, 0, 0, length, 1)
     list_peers = get_list_peers(tracker_url, info_hash, peer_id, 6881, 0, 0, length, 1)
     ip, port = list_peers[0]
-    # ip = '192.168.0.191'
-    # port = 6881
+    # ip = '192.168.1.10'
+    # port = 2000
     print(ip, port)
     sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-
+    
     payload = (
         b"\x13BitTorrent protocol\x00\x00\x00\x00\x00\x00\x00\x00"
         + info_hash
         + peer_id.encode()
     )
+
 
     try:
         sock.connect((ip, port))
@@ -184,74 +102,156 @@ def download_piece(tracker_url, length, info_hash, pieces, piece_length, peer_id
         response = sock.recv(68)
         
         message = receive_message(sock)
+        print(message)
         while int(message[4]) != 5:
             message = receive_message(sock)
+        
 
         interested_payload = struct.pack(">IB", 1, 2)
+        print(interested_payload)
         sock.sendall(interested_payload)
         
         sock.settimeout(3)
         
         message = receive_message(sock)
+
         while int(message[4]) != 1:
-            message = receive_message(sock)
+            message =receive_message(sock)
 
-        list_piece_hashes = get_list_piece_hashs(pieces)
-        num_pieces = len(list_piece_hashes)
+        list_piece_hashs = get_list_piece_hashs(pieces)
+        num_peers = len(list_piece_hashs)
 
-        if peer_index == num_pieces - 1:
+        if peer_index == num_peers - 1:
             piece_length = length - piece_length * peer_index
+        
+        num_blocks = math.ceil(piece_length / (16*1024))
 
-        num_blocks = math.ceil(piece_length / (16 * 1024))
         data = bytearray()
 
         for i in range(num_blocks):
             block_start = 16 * 1024 * i
-            block_length = min(piece_length - block_start, 16 * 1024)
-            print(f"Requesting block {i+1} of {num_blocks} for piece {peer_index} with length {block_length}")
+            block_length = min(piece_length - block_start, 16*1024)
+            print(f"request block {i+1} of {num_blocks} with len {block_length}")
 
             request_payload = struct.pack(">IBIII", 13, 6, peer_index, block_start, block_length)
+
             sock.sendall(request_payload)
             message = receive_message(sock)
             data.extend(message[13:])
         
-        print(f"Piece {peer_index} downloaded successfully.")
-        return data
+        with open(output, "ab") as f:
+            f.write(data)
+        print("end file")
+        data.clear()
 
     finally:
-        print(f"Closing connection to peer for piece {peer_index}")
+        print("close socket")
         sock.close()
 
+    return True
 
 def download(torrent_file, output):
+
     tracker_url, length, info_hash, pieces, piece_length = get_info(torrent_file)
-    piece_hashes = get_list_piece_hashs(pieces)
-    num_pieces = len(piece_hashes)
+    num_piece = len(get_list_piece_hashs(pieces))
+    for i in range(num_piece):
+        download_piece(tracker_url, length, info_hash, pieces, piece_length, "01234567899876543210", i, output)
+    return True
 
-    downloaded_pieces = [None] * num_pieces
-    
-    with concurrent.futures.ThreadPoolExecutor(max_workers=10) as executor:
-        futures = {
-            executor.submit(download_piece, tracker_url, length, info_hash, pieces, piece_length, "01234567899876543210", i): i
-            for i in range(num_pieces)
-        }
+
+
+
+
+# def download_piece(tracker_url, length, info_hash, pieces, piece_length, peer_id, peer_index):
+
+#     # print("aaaaaaaaaaaaaaaaaaaa", tracker_url, info_hash.hex(), peer_id, 6881, 0, 0, length, 1)
+#     list_peers = get_list_peers(tracker_url, info_hash, peer_id, 6881, 0, 0, length, 1)
+#     ip, port = list_peers[0]
+#     # ip = '192.168.0.191'
+#     # port = 6881
+#     print(ip, port)
+#     sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+
+#     payload = (
+#         b"\x13BitTorrent protocol\x00\x00\x00\x00\x00\x00\x00\x00"
+#         + info_hash
+#         + peer_id.encode()
+#     )
+
+#     try:
+#         sock.connect((ip, port))
+#         sock.sendall(payload)
+#         response = sock.recv(68)
         
-        for future in concurrent.futures.as_completed(futures):
-            piece_index = futures[future]
-            try:
-                data = future.result()
-                downloaded_pieces[piece_index] = data
-                print(f"Piece {piece_index} stored successfully.")
-            except Exception as e:
-                print(f"Piece {piece_index} download failed: {e}")
+#         message = receive_message(sock)
+#         while int(message[4]) != 5:
+#             message = receive_message(sock)
+
+#         interested_payload = struct.pack(">IB", 1, 2)
+#         sock.sendall(interested_payload)
+        
+#         sock.settimeout(3)
+        
+#         message = receive_message(sock)
+#         while int(message[4]) != 1:
+#             message = receive_message(sock)
+
+#         list_piece_hashes = get_list_piece_hashs(pieces)
+#         num_pieces = len(list_piece_hashes)
+
+#         if peer_index == num_pieces - 1:
+#             piece_length = length - piece_length * peer_index
+
+#         num_blocks = math.ceil(piece_length / (16 * 1024))
+#         data = bytearray()
+
+#         for i in range(num_blocks):
+#             block_start = 16 * 1024 * i
+#             block_length = min(piece_length - block_start, 16 * 1024)
+#             print(f"Requesting block {i+1} of {num_blocks} for piece {peer_index} with length {block_length}")
+
+#             request_payload = struct.pack(">IBIII", 13, 6, peer_index, block_start, block_length)
+#             sock.sendall(request_payload)
+#             message = receive_message(sock)
+#             data.extend(message[13:])
+        
+#         print(f"Piece {peer_index} downloaded successfully.")
+#         return data
+
+#     finally:
+#         print(f"Closing connection to peer for piece {peer_index}")
+#         sock.close()
 
 
-    with open(output, "wb") as f:
-        for i, piece in enumerate(downloaded_pieces):
-            if piece is not None:
-                f.write(piece)
-            else:
-                print(f"Warning: Piece {i} is missing and was not downloaded.")
+# def download(torrent_file, output):
+#     tracker_url, length, info_hash, pieces, piece_length = get_info(torrent_file)
+#     piece_hashes = get_list_piece_hashs(pieces)
+#     num_pieces = len(piece_hashes)
+
+#     downloaded_pieces = [None] * num_pieces
+    
+#     with concurrent.futures.ThreadPoolExecutor(max_workers=10) as executor:
+#         futures = {
+#             executor.submit(download_piece, tracker_url, length, info_hash, pieces, piece_length, "01234567899876543210", i): i
+#             for i in range(num_pieces)
+#         }
+        
+#         for future in concurrent.futures.as_completed(futures):
+#             piece_index = futures[future]
+#             try:
+#                 data = future.result()
+#                 downloaded_pieces[piece_index] = data
+#                 print(f"Piece {piece_index} stored successfully.")
+#             except Exception as e:
+#                 print(f"Piece {piece_index} download failed: {e}")
+
+
+#     with open(output, "wb") as f:
+#         for i, piece in enumerate(downloaded_pieces):
+#             if piece is not None:
+#                 f.write(piece)
+#             else:
+#                 print(f"Warning: Piece {i} is missing and was not downloaded.")
 
 
 def upload_piece_by_piece(torrent_file, file_path, peer_id="01234567899876543211", port=6881):
@@ -448,7 +448,7 @@ def main():
     elif command == "upload":
         torrent_file = sys.argv[2]
         file_path = sys.argv[3]
-        upload_piece_by_piece(torrent_file, file_path, peer_id="01234567899876543210", port=6881)
+        upload_piece_by_piece(torrent_file, file_path, peer_id="01234567899876543210", port=2000)
 
     elif command == "create_torrent":
         # http://192.168.150.190:6881/announce

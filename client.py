@@ -28,15 +28,14 @@ class peer:
         
         for file in files:
             file_path = os.path.join("file", file)
-            file_size = os.path.getsize(file_path)
-            print(f"Sending file info to tracker: {file} with size {file_size}")
-
+            torrent_file_path = self.create_torrent(file_path, self.tracker_url, "torrent_folder")
+            _, _, info_hash, _, _ = self.get_info(torrent_file_path)
+            print(info_hash)
 
             params = {
                 "ip": ip,
                 "port": port,
-                "file_name": file,
-                "file_length": file_size,
+                "info_hash": info_hash,
                 "event": "started"
             }
             try:
@@ -48,13 +47,36 @@ class peer:
             except Exception as e:
                 print(f"Error connecting to tracker for file {file}: {e}")
 
-
-
-
-
-
-
             
+
+
+
+
+    def create_torrent(self, file_path, tracker_url, folder_out = "torrent", piece_length=512*1024):
+    
+        os.makedirs(folder_out, exist_ok=True)
+
+        file_name = os.path.basename(file_path)
+        file_size = os.path.getsize(file_path)
+        piece_hashes = self.get_piece_hashes(file_path, piece_length)
+        torrent_info = {
+            "announce": tracker_url,
+            "info": {
+                "name": file_name,
+                "length": file_size,
+                "piece length": piece_length,
+                "pieces": piece_hashes,
+            }
+        }
+
+        torrent_file_path = os.path.join(folder_out, f"{file_name}.torrent")
+        with open(torrent_file_path, "wb") as torrent_file:
+            torrent_file.write(bencodepy.encode(torrent_info))
+
+
+        print(f"Torrent file created: {torrent_file_path}")
+        return torrent_file_path
+
     def get_info(self, torrent_file):
         with open(torrent_file, "rb") as f:
             torrent_data = bencode.decode(f.read())
@@ -67,9 +89,9 @@ class peer:
         return tracker_url, length, info_hash, pieces, piece_length
 
     def decode_bencode(self, bencoded_value):
+
         return bencode.decode(bencoded_value)
 
-    def get_info(self, torrent_file):
         with open(torrent_file, "rb") as f:
             torrent_data = bencode.decode(f.read())
         
@@ -79,7 +101,7 @@ class peer:
         piece_length = torrent_data['info']["piece length"]
         pieces = torrent_data["info"]["pieces"]
         return tracker_url, length, info_hash, pieces, piece_length
-
+    
     def get_list_piece_hashs(self, pieces):
         list_pieces = []
         for i in range(0, len(pieces), 20):
@@ -145,7 +167,7 @@ class peer:
     def download_piece(self, tracker_url, length, info_hash, pieces, piece_length, peer_id, peer_index):
 
         # print("aaaaaaaaaaaaaaaaaaaa", tracker_url, info_hash.hex(), peer_id, 6881, 0, 0, length, 1)
-        # list_peers = get_list_peers(tracker_url, info_hash, peer_id, 6881, 0, 0, length, 1)
+        # list_peers = self.get_list_peers(tracker_url, info_hash, peer_id, 6881, 0, 0, length, 1)
         # ip, port = list_peers[0]
         ip = '192.168.0.191'
         port = 6881
@@ -231,6 +253,8 @@ class peer:
                     f.write(piece)
                 else:
                     print(f"Warning: Piece {i} is missing and was not downloaded.")
+
+        return True
 
     def upload_piece_by_piece(self, torrent_file, file_path, peer_id="01234567899876543211", port=6881):
 
@@ -321,13 +345,50 @@ class peer:
 
     
 
-
 if __name__ == "__main__":
-    #1 port #2 ip:port tracker
+    # command = sys.argv[1]
+    
+    # ip = socket.gethostbyname(socket.gethostname())
+    # port = int(sys.argv[1])
+    # tracker = sys.argv[2].split(":")
+    # tracker_ip = tracker[0]
+    # tracker_port = int(tracker[1])
+    
+    # client = peer(ip, port, tracker_ip, tracker_port)
+    
+    # output = ""
+    # torrent_file = ""
+    
+    # upload_thread = threading.Thread(target=client.upload_piece_by_piece, args=(output, torrent_file))
+    # upload_thread.daemon = True
+    # upload_thread.start()
+
+
+    # while True:
+    #     command = input("Nhập lệnh: ")
+    #     if "download" in command:
+    #         output = sys.argv[1]
+    #         torrent_file = sys.argv[2]
+    #         print(output, torrent_file)
+    #         # if client.download(torrent_file, output):
+    #         #     print(f"Tải xuống {torrent_file} thành công tới {output}")
+    #     else:
+    #         print("Lệnh không hợp lệ.")
     ip = socket.gethostbyname(socket.gethostname())
-    port = int(sys.argv[1])
-    tracker = sys.argv[2].split(":")
+    # port = int(sys.argv[1])
+    port = int(input('nhap port:'))
+    print(f"dsdsada: {port}")
+    # tracker = sys.argv[2].split(":")
+    tracker_input = input("nhập địa chỉ tracker: ")
+    print(f"dsdsada: {input}")
+    tracker = tracker_input.split(":")
     tracker_ip = tracker[0]
     tracker_port = int(tracker[1])
     print(tracker, tracker_ip, tracker_port)
-    client = peer(ip, port, tracker_ip, tracker_port)
+    while True:
+        command = input("nhập lệnh: ")
+        if command == "end":
+            break
+        elif command == "dowload":
+            
+            print("thực hiện dowload:")
