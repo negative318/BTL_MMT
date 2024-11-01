@@ -1,0 +1,36 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="stylesheet" href="reset.css">
+    <link rel="stylesheet" href="{{ url_for('static', filename='test.css') }}">
+    <link rel="stylesheet" href="https://pro.fontawesome.com/releases/v5.10.0/css/all.css">
+ 
+    <title>Register Page</title>
+</head>
+<body>
+    <div id="wrapper">
+        <form action="" id="form-login" method="post">
+            <h1 class="form-heading">REGISTER</h1>
+            <div class="form-group">
+                <i class="far fa-user"></i>
+                <input type="text" name="username" class="form-input" placeholder="Username" required>
+            </div>
+            <div class="form-group">
+                <i class="fas fa-key"></i>
+                <input type="password" name="password" class="form-input" placeholder="Password" required>
+            </div>
+            <div class="form-group">
+                <i class="far fa-envelope"></i>
+                <input type="email" name="email" class="form-input" placeholder="Email" required>
+            </div>
+            <input type="submit" value="Register" class="form-submit">
+            <p><a href="{{ url_for('login') }}">Login</a></p>
+        </form>
+    </div>
+</body>
+<script src="https://code.jquery.com/jquery-3.6.0.js"></script>
+<script src="{{ url_for('static', filename='script/test.js') }}"></script>
+</html>
