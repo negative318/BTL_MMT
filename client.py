@@ -11,7 +11,7 @@ import os
 import threading
 import concurrent.futures
 from tabulate import tabulate
-
+import mmap
 import requests
 
 class peer:
@@ -30,7 +30,7 @@ class peer:
         threading.Thread(target=self.start_upload_listener, daemon=True).start()
 
 
-    def start_upload_listener(self, torrent_file= "torrent/test.mp4.torrent", file_path = "file/test.mp4"):
+    def start_upload_listener(self, torrent_file= "torrent/ML.docx.torrent", file_path = "file/ML.docx"):
         try:
             self.upload_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
             self.upload_socket.bind((self.ip, self.port))
@@ -74,6 +74,7 @@ class peer:
                     print(f"Failed to send info for file: {file}. Status code: {response.status_code}")
             except Exception as e:
                 print(f"Error connecting to tracker for file {file}: {e}")
+        self.print_file_info_table()
 
     def print_file_info_table(self):
         # Tạo bảng từ dictionary
@@ -262,69 +263,41 @@ class peer:
             sock.close()
 
 
-    # multi-thread
+
     def download(self, torrent_file, output):
         tracker_url, length, info_hash, pieces, piece_length = self.get_info(torrent_file)
         piece_hashes = self.get_list_piece_hashs(pieces)
         num_pieces = len(piece_hashes)
 
-        downloaded_pieces = [None] * num_pieces
-        
+        with open(output, "wb") as f:
+            f.truncate(length)
+
+        def write_piece_to_disk(data, piece_index):
+            offset = piece_index * piece_length
+            with open(output, "r+b") as f:
+                with mmap.mmap(f.fileno(), 0) as mm:
+                    mm[offset:offset+len(data)] = data
+
         with concurrent.futures.ThreadPoolExecutor(max_workers=100) as executor:
             futures = {
                 executor.submit(self.download_piece, tracker_url, length, info_hash, pieces, piece_length, "01234567899876543210", i): i
                 for i in range(num_pieces)
             }
-            
+
             for future in concurrent.futures.as_completed(futures):
                 piece_index = futures[future]
                 try:
                     data = future.result()
-                    downloaded_pieces[piece_index] = data
-                    print(f"Piece {piece_index} stored successfully.")
+                    if data is not None:
+                        write_piece_to_disk(data, piece_index)
+                        print(f"Piece {piece_index} stored successfully on disk.")
+                    else:
+                        print(f"Piece {piece_index} download failed.")
                 except Exception as e:
-                    print(f"Piece {piece_index} download failed: {e}")
+                    print(f"Error writing piece {piece_index}: {e}")
 
-
-        with open(output, "wb") as f:
-            for i, piece in enumerate(downloaded_pieces):
-                if piece is not None:
-                    f.write(piece)
-                else:
-                    print(f"Warning: Piece {i} is missing and was not downloaded.")
-
+        print("Download complete.")
         return True
-
-
-    #one thread
-    # def download(self, torrent_file, output):
-    #     tracker_url, length, info_hash, pieces, piece_length = self.get_info(torrent_file)
-    #     piece_hashes = self.get_list_piece_hashs(pieces)
-    #     num_pieces = len(piece_hashes)
-
-    #     downloaded_pieces = [None] * num_pieces
-        
-    #     if not os.path.exists(output):
-    #         open(output, "wb").close()
-
-    #     for i in range(num_pieces):
-    #         try:
-    #             data = self.download_piece(tracker_url, length, info_hash, pieces, piece_length, "01234567899876543210", i)
-    #             downloaded_pieces[i] = data
-    #             print(f"Piece {i} downloaded and stored successfully.")
-    #         except Exception as e:
-    #             print(f"Piece {i} download failed: {e}")
-
-    #     with open(output, "wb") as f:
-    #         for i, piece in enumerate(downloaded_pieces):
-    #             if piece is not None:
-    #                 f.write(piece)
-    #             else:
-    #                 print(f"Warning: Piece {i} is missing and was not downloaded.")
-
-    #     return True
-
-
 
 
 
@@ -410,7 +383,7 @@ class peer:
 if __name__ == "__main__":
 
 
-    ip = socket.gethostbyname(socket.gethostname())
+    ip = "192.168.1.9"
     port = int(sys.argv[1])
     tracker = sys.argv[2].split(":")
     tracker_ip = tracker[0]

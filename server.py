@@ -108,6 +108,7 @@ class server:
         incomplete_count = 0
         interval = 60
 
+
         response = (
             b"d" 
             b"8:completei" + str(complete_count).encode() + b"e"
@@ -150,11 +151,11 @@ class server:
     def start_tracker_server(self, port=6881):
         server_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         
-        # Lấy địa chỉ IP của máy hiện tại
+        
         hostname = socket.gethostname()
         server_ip = socket.gethostbyname(hostname)
 
-        server_socket.bind((server_ip, port))
+        server_socket.bind(("0.0.0.0", port))
         server_socket.listen(5)
         print(f"Tracker is running on IP {server_ip} and port {port}...")
 
