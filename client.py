@@ -10,31 +10,57 @@ import math
 import os
 import threading
 import concurrent.futures
-
+from tabulate import tabulate
 
 import requests
 
 class peer:
     def __init__(self, ip, port, tracker_ip, tracker_port):
-        self.download = None
-        self.upload = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        self.upload.bind((ip, port))
-        self.upload.listen(5)
-        print(f"Đang lắng nghe kết nối trên địa chỉ {ip} và cổng {port}...")
-
+        
+        
+        self.ip = ip
+        self.port = port
+        self.tracker_ip = tracker_ip
+        self.tracker_port = tracker_port
         self.tracker_url = f"http://{tracker_ip}:{tracker_port}/announce"
+
+        self.file_info_list = {}
+        self.register_files_with_tracker()
+        
+        threading.Thread(target=self.start_upload_listener, daemon=True).start()
+
+
+    def start_upload_listener(self, torrent_file= "torrent/test.mp4.torrent", output = "out.mp4"):
+        try:
+            self.upload_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+            self.upload_socket.bind((self.ip, self.port))
+            self.upload_socket.listen(5)
+            print(f"Listening for upload connections on ip {self.ip} port {self.port}...")
+        except Exception as e:
+            print(f"Error in setting up listener: {e}")
+            return
+
+        while True:
+            try:
+                client_socket, address = self.upload_socket.accept()
+                print(f"Connection received from {address}")
+                threading.Thread(target=self.upload_piece_by_piece, args=(torrent_file, output), daemon=True).start()
+            except Exception as e:
+                print(f"Error in handling connection: {e}")
+
+
+    def register_files_with_tracker(self):
         files = os.listdir("file")
-        
-        
         for file in files:
             file_path = os.path.join("file", file)
-            torrent_file_path = self.create_torrent(file_path, self.tracker_url, "torrent_folder")
+            torrent_file_path = self.create_torrent(file_path, self.tracker_url, "torrent")
             _, _, info_hash, _, _ = self.get_info(torrent_file_path)
-            print(info_hash)
+            info_hash_hex = info_hash.hex()
+            self.file_info_list[info_hash_hex] = file_path
 
             params = {
-                "ip": ip,
-                "port": port,
+                "ip": self.ip,
+                "port": self.port,
                 "info_hash": info_hash,
                 "event": "started"
             }
@@ -47,7 +73,53 @@ class peer:
             except Exception as e:
                 print(f"Error connecting to tracker for file {file}: {e}")
 
-            
+    def handle_upload_request(self, client_socket, address):
+        try:
+            peer_handshake = client_socket.recv(68)
+            info_hash = peer_handshake[28:48]
+            if info_hash not in self.file_info_list:
+                print("Requested file not available")
+                client_socket.close()
+                return
+
+
+            torrent_file_path = self.file_info_list[info_hash]
+            _, _, _, pieces, piece_length = self.get_info(torrent_file_path)
+            client_socket.sendall(b"\x13BitTorrent protocol\x00\x00\x00\x00\x00\x00\x00\x00" + info_hash + b"01234567899876543211")
+
+            # Bitfield message to indicate available pieces
+            num_pieces = len(self.get_list_piece_hashs(pieces))
+            bitfield = bytearray(math.ceil(num_pieces / 8))
+            for i in range(num_pieces):
+                bitfield[i // 8] |= (1 << (7 - (i % 8)))
+            client_socket.sendall(struct.pack(">IB", len(bitfield) + 1, 5) + bitfield)
+
+            # Process the client's requests for specific pieces
+            while True:
+                message = self.receive_message(client_socket)
+                if not message:
+                    break
+                message_id = message[4]
+                if message_id == 6:  # Request message
+                    index, offset, length = struct.unpack(">III", message[5:17])
+                    self.send_piece(client_socket, torrent_file_path, index, offset, length, piece_length)
+                elif message_id == 2:  # Interested message
+                    client_socket.sendall(struct.pack(">IB", 1, 1))  # Unchoke message
+        except Exception as e:
+            print(f"Error handling upload for peer {address}: {e}")
+        finally:
+            client_socket.close()
+
+    def print_file_info_table(self):
+        # Tạo bảng từ dictionary
+        headers = ["Info Hash", "File Path"]
+        data = [[info_hash, file_path] for info_hash, file_path in self.file_info_list.items()]
+        
+        # In bảng sử dụng tabulate
+        print(tabulate(data, headers=headers, tablefmt="grid"))
+
+
+
 
 
 
@@ -166,11 +238,11 @@ class peer:
 
     def download_piece(self, tracker_url, length, info_hash, pieces, piece_length, peer_id, peer_index):
 
-        # print("aaaaaaaaaaaaaaaaaaaa", tracker_url, info_hash.hex(), peer_id, 6881, 0, 0, length, 1)
-        # list_peers = self.get_list_peers(tracker_url, info_hash, peer_id, 6881, 0, 0, length, 1)
-        # ip, port = list_peers[0]
-        ip = '192.168.0.191'
-        port = 6881
+
+        list_peers = self.get_list_peers(tracker_url, info_hash, peer_id, 6881, 0, 0, length, 1)
+        ip, port = list_peers[0]
+        # ip = '192.168.0.191'
+        # port = 6881
         print(ip, port)
         sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
 
@@ -323,13 +395,14 @@ class peer:
 
         try:
             while True:
-                client_socket, address = self.upload.accept()
+                client_socket, address = self.upload_socket.accept()
                 peer_thread = threading.Thread(target=handle_peer_connection, args=(client_socket, address))
                 peer_thread.start()
         except KeyboardInterrupt:
             print("Dừng server upload.")
         finally:
-            self.upload.close()
+            pass
+            # self.upload_socket.close()
 
     def get_piece_hashes(self, file_path, piece_length):
 
@@ -343,52 +416,33 @@ class peer:
                 piece_hashes += piece_hash
         return piece_hashes
 
-    
+
 
 if __name__ == "__main__":
-    # command = sys.argv[1]
-    
-    # ip = socket.gethostbyname(socket.gethostname())
-    # port = int(sys.argv[1])
-    # tracker = sys.argv[2].split(":")
-    # tracker_ip = tracker[0]
-    # tracker_port = int(tracker[1])
-    
-    # client = peer(ip, port, tracker_ip, tracker_port)
-    
-    # output = ""
-    # torrent_file = ""
-    
-    # upload_thread = threading.Thread(target=client.upload_piece_by_piece, args=(output, torrent_file))
-    # upload_thread.daemon = True
-    # upload_thread.start()
 
 
-    # while True:
-    #     command = input("Nhập lệnh: ")
-    #     if "download" in command:
-    #         output = sys.argv[1]
-    #         torrent_file = sys.argv[2]
-    #         print(output, torrent_file)
-    #         # if client.download(torrent_file, output):
-    #         #     print(f"Tải xuống {torrent_file} thành công tới {output}")
-    #     else:
-    #         print("Lệnh không hợp lệ.")
     ip = socket.gethostbyname(socket.gethostname())
-    # port = int(sys.argv[1])
-    port = int(input('nhap port:'))
-    print(f"dsdsada: {port}")
-    # tracker = sys.argv[2].split(":")
-    tracker_input = input("nhập địa chỉ tracker: ")
-    print(f"dsdsada: {input}")
-    tracker = tracker_input.split(":")
+    port = int(sys.argv[1])
+    tracker = sys.argv[2].split(":")
     tracker_ip = tracker[0]
     tracker_port = int(tracker[1])
     print(tracker, tracker_ip, tracker_port)
+    client = peer(ip, port, tracker_ip, tracker_port)
+
+    thread = threading.Thread(target=client.start_upload_listener, args=())
+    thread.start()
     while True:
-        command = input("nhập lệnh: ")
-        if command == "end":
-            break
-        elif command == "dowload":
-            
-            print("thực hiện dowload:")
+
+        user_input = input("input: ")
+
+        parts = user_input.split(maxsplit=2)
+
+        if len(parts) != 3:
+            print("Error: Please enter exactly three values: command, torrent_file, and output.")
+        else:
+            command, torrent_file, output = parts
+
+            print(f"Command: {command}, Torrent file: {torrent_file}, Output: {output}")
+            if command == "download":
+                client.download(torrent_file, output)
+
