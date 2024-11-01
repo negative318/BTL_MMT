@@ -1,0 +1,138 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>enter</title>
+    <style>
+/* styles.css */
+body {
+    font-family: Arial, sans-serif;
+    background-color: #f4f4f4;
+    margin: 0;
+    padding: 0;
+}
+
+header {
+    background-color: #4CAF50;
+    color: #ffffff;
+    padding: 20px 0;
+    text-align: center;
+}
+
+main {
+    padding: 20px;
+}
+
+form {
+    background: #ffffff;
+    padding: 20px;
+    border-radius: 5px;
+    box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
+    margin-bottom: 20px;
+}
+
+label {
+    display: block;
+    margin: 10px 0 5px;
+}
+
+input, select {
+    width: 100%;
+    padding: 10px;
+    margin-bottom: 10px;
+    border: 1px solid #ccc;
+    border-radius: 4px;
+}
+
+button {
+    background-color: #4CAF50;
+    color: white;
+    border: none;
+    padding: 10px;
+    cursor: pointer;
+    border-radius: 4px;
+}
+
+button:hover {
+    background-color: #45a049;
+}
+
+table {
+    width: 100%;
+    border-collapse: collapse;
+}
+
+th, td {
+    border: 1px solid #ddd;
+    padding: 8px;
+    text-align: left;
+}
+
+th {
+    background-color: #4CAF50;
+    color: white;
+}
+
+footer {
+    text-align: center;
+    padding: 10px;
+    background-color: #4CAF50;
+    color: white;
+    position: relative;
+    bottom: 0;
+    width: 100%;
+}
+    </style>
+</head>
+<body>
+    <header>
+    </header>
+
+    <main>
+        <form id="torrentForm">
+            <label for="ip">IP:</label>
+            <input type="text" id="ip" name="ip" required>
+
+            <label for="port">Port:</label>
+            <input type="number" id="port" name="port" required>
+
+            <label for="fileName">File name:</label>
+            <input type="text" id="fileName" name="fileName" required>
+
+            <label for="size">Size:</label>
+            <input type="text" id="size" name="size" required>
+
+            <label for="status">Status:</label>
+            <select id="status" name="status" required>
+                <option value="đang tải">Downloading</option>
+                <option value="hoàn thành">Finish</option>
+                <option value="thất bại">Fail</option>
+            </select>
+
+            <button type="submit">Add</button>
+        </form>
+
+        <table id="torrentTable">
+            <thead>
+                <tr>
+                    <th>IP</th>
+                    <th>Port</th>
+                    <th>File name</th>
+                    <th>Size</th>
+                    <th>Status</th>
+                </tr>
+            </thead>
+            <tbody>
+                <!-- Dữ liệu sẽ được thêm vào đây -->
+            </tbody>
+        </table>
+    </main>
+
+    <footer>
+        <p>&copy; P2P Website</p>
+    </footer>
+
+    <script src="script.js"></script>
+</body>
+</html>
