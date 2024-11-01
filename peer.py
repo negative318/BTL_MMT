@@ -273,7 +273,7 @@ def upload_piece_by_piece(torrent_file, file_path, peer_id="01234567899876543211
                 client_socket.close()
                 return
 
-            # Gửi lại Handshake với thông điệp `bitfield`
+
             handshake_response = (
                 b"\x13BitTorrent protocol\x00\x00\x00\x00\x00\x00\x00\x00" +
                 info_hash +

@@ -26,11 +26,11 @@ class peer:
 
         self.file_info_list = {}
         self.register_files_with_tracker()
-        
+
         threading.Thread(target=self.start_upload_listener, daemon=True).start()
 
 
-    def start_upload_listener(self, torrent_file= "torrent/test.mp4.torrent", output = "out.mp4"):
+    def start_upload_listener(self, torrent_file= "torrent/test.mp4.torrent", file_path = "file/test.mp4"):
         try:
             self.upload_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
             self.upload_socket.bind((self.ip, self.port))
@@ -44,7 +44,9 @@ class peer:
             try:
                 client_socket, address = self.upload_socket.accept()
                 print(f"Connection received from {address}")
-                threading.Thread(target=self.upload_piece_by_piece, args=(torrent_file, output), daemon=True).start()
+
+                threading.Thread(target=self.upload_piece_by_piece, args=(client_socket, address, torrent_file, file_path), daemon=True).start()
+
             except Exception as e:
                 print(f"Error in handling connection: {e}")
 
@@ -72,43 +74,6 @@ class peer:
                     print(f"Failed to send info for file: {file}. Status code: {response.status_code}")
             except Exception as e:
                 print(f"Error connecting to tracker for file {file}: {e}")
-
-    def handle_upload_request(self, client_socket, address):
-        try:
-            peer_handshake = client_socket.recv(68)
-            info_hash = peer_handshake[28:48]
-            if info_hash not in self.file_info_list:
-                print("Requested file not available")
-                client_socket.close()
-                return
-
-
-            torrent_file_path = self.file_info_list[info_hash]
-            _, _, _, pieces, piece_length = self.get_info(torrent_file_path)
-            client_socket.sendall(b"\x13BitTorrent protocol\x00\x00\x00\x00\x00\x00\x00\x00" + info_hash + b"01234567899876543211")
-
-            # Bitfield message to indicate available pieces
-            num_pieces = len(self.get_list_piece_hashs(pieces))
-            bitfield = bytearray(math.ceil(num_pieces / 8))
-            for i in range(num_pieces):
-                bitfield[i // 8] |= (1 << (7 - (i % 8)))
-            client_socket.sendall(struct.pack(">IB", len(bitfield) + 1, 5) + bitfield)
-
-            # Process the client's requests for specific pieces
-            while True:
-                message = self.receive_message(client_socket)
-                if not message:
-                    break
-                message_id = message[4]
-                if message_id == 6:  # Request message
-                    index, offset, length = struct.unpack(">III", message[5:17])
-                    self.send_piece(client_socket, torrent_file_path, index, offset, length, piece_length)
-                elif message_id == 2:  # Interested message
-                    client_socket.sendall(struct.pack(">IB", 1, 1))  # Unchoke message
-        except Exception as e:
-            print(f"Error handling upload for peer {address}: {e}")
-        finally:
-            client_socket.close()
 
     def print_file_info_table(self):
         # Tạo bảng từ dictionary
@@ -296,6 +261,8 @@ class peer:
             print(f"Closing connection to peer for piece {peer_index}")
             sock.close()
 
+
+    # multi-thread
     def download(self, torrent_file, output):
         tracker_url, length, info_hash, pieces, piece_length = self.get_info(torrent_file)
         piece_hashes = self.get_list_piece_hashs(pieces)
@@ -328,30 +295,59 @@ class peer:
 
         return True
 
-    def upload_piece_by_piece(self, torrent_file, file_path, peer_id="01234567899876543211", port=6881):
+
+    #one thread
+    # def download(self, torrent_file, output):
+    #     tracker_url, length, info_hash, pieces, piece_length = self.get_info(torrent_file)
+    #     piece_hashes = self.get_list_piece_hashs(pieces)
+    #     num_pieces = len(piece_hashes)
+
+    #     downloaded_pieces = [None] * num_pieces
+        
+    #     if not os.path.exists(output):
+    #         open(output, "wb").close()
+
+    #     for i in range(num_pieces):
+    #         try:
+    #             data = self.download_piece(tracker_url, length, info_hash, pieces, piece_length, "01234567899876543210", i)
+    #             downloaded_pieces[i] = data
+    #             print(f"Piece {i} downloaded and stored successfully.")
+    #         except Exception as e:
+    #             print(f"Piece {i} download failed: {e}")
+
+    #     with open(output, "wb") as f:
+    #         for i, piece in enumerate(downloaded_pieces):
+    #             if piece is not None:
+    #                 f.write(piece)
+    #             else:
+    #                 print(f"Warning: Piece {i} is missing and was not downloaded.")
+
+    #     return True
+
+
+
+
+
+    def upload_piece_by_piece(self, client_socket, address, torrent_file, file_path, peer_id="01234567899876543211", port=6881):
 
         tracker_url, length, info_hash, pieces, piece_length = self.get_info(torrent_file)
-        
-
 
         def handle_peer_connection(client_socket, address):
             try:
-                print(f"Kết nối với peer: {address}")
+                print(f"Connected with peer: {address}")
 
                 peer_handshake = client_socket.recv(68)
                 if peer_handshake[28:48] != info_hash:
-                    print("Info hash không khớp; đóng kết nối")
+                    print("Info hash does not match; closing connection")
                     client_socket.close()
                     return
 
-                # Gửi lại Handshake với thông điệp `bitfield`
                 handshake_response = (
                     b"\x13BitTorrent protocol\x00\x00\x00\x00\x00\x00\x00\x00" +
                     info_hash +
                     peer_id.encode()
                 )
                 client_socket.sendall(handshake_response)
-
 
                 num_pieces = len(self.get_list_piece_hashs(pieces))
                 bitfield = bytearray(math.ceil(num_pieces / 8))
@@ -360,20 +356,21 @@ class peer:
                     bit_index = 7 - (i % 8)
                     bitfield[byte_index] |= (1 << bit_index)
 
-
                 bitfield_msg = struct.pack(">IB", len(bitfield) + 1, 5) + bitfield
                 client_socket.sendall(bitfield_msg)
-                
+
                 while True:
                     message = self.receive_message(client_socket)
                     if message is None:
                         break
 
                     message_id = message[4]
+                    
                     if message_id == 2:
-                        print("Nhận được thông điệp 'interested' từ peer")
-                        unchoke_msg = struct.pack(">IB", 1, 1)
+                        print("Received 'interested' message from peer")
+                        unchoke_msg = struct.pack(">IB", 1, 1) 
                         client_socket.sendall(unchoke_msg)
+                    
                     elif message_id == 6:
                         index, offset, length = struct.unpack(">III", message[5:17])
                         piece_start = index * piece_length + offset
@@ -381,28 +378,20 @@ class peer:
                             f.seek(piece_start)
                             data_to_send = f.read(length)
                         piece_msg = struct.pack(">IBII", 9 + len(data_to_send), 7, index, offset) + data_to_send
+
+
                         client_socket.sendall(piece_msg)
-                        print(f"send {index} offset {offset} length {length} to peer {address}")
+                        print(f"Sent piece {index}, offset {offset}, length {length} to peer {address}")
                     else:
-                        print(f"Nhận được thông điệp không xác định với ID: {message_id}")
+                        print(f"Received unknown message ID: {message_id} from peer")
 
             except Exception as e:
-                print(f"Lỗi với peer {address}: {e}")
+                print(f"Error with peer {address}: {e}")
             finally:
                 client_socket.close()
-                print(f"Kết nối với peer {address} đã đóng")
+                print(f"Connection with peer {address} closed")
 
-
-        try:
-            while True:
-                client_socket, address = self.upload_socket.accept()
-                peer_thread = threading.Thread(target=handle_peer_connection, args=(client_socket, address))
-                peer_thread.start()
-        except KeyboardInterrupt:
-            print("Dừng server upload.")
-        finally:
-            pass
-            # self.upload_socket.close()
+        handle_peer_connection(client_socket, address)
 
     def get_piece_hashes(self, file_path, piece_length):
 
@@ -429,8 +418,6 @@ if __name__ == "__main__":
     print(tracker, tracker_ip, tracker_port)
     client = peer(ip, port, tracker_ip, tracker_port)
 
-    thread = threading.Thread(target=client.start_upload_listener, args=())
-    thread.start()
     while True:
 
         user_input = input("input: ")
