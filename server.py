@@ -152,8 +152,13 @@ class server:
         server_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         
         
-        hostname = socket.gethostname()
-        server_ip = socket.gethostbyname(hostname)
+        # hostname = socket.gethostname()
+        # server_ip = socket.gethostbyname(hostname)
+        with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as s:
+            # Use a non-routable address to determine local IP, like Google's public DNS
+            s.connect(("8.8.8.8", 80))
+            server_ip = s.getsockname()[0]
+
 
         server_socket.bind(("0.0.0.0", port))
         server_socket.listen(5)
