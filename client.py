@@ -26,14 +26,20 @@ class peer:
 
         self.file_info_list = {}
         self.register_files_with_tracker()
-
+        self.file_name = ""
+        self.size = 0
+        self.status = 0
         threading.Thread(target=self.start_upload_listener, daemon=True).start()
 
+    def get_status(self):
+        status = f"ip: {self.ip}, port: {self.port}, file_name: {self.file_name}, size: {self.size}, status: {self.status: .2f}%"
+        return status
+        # return self.ip, self.port, self.file_name, self.size, self.status
 
-    def start_upload_listener(self, torrent_file= "torrent/ML.docx.torrent", file_path = "file/ML.docx"):
+    def start_upload_listener(self, torrent_file= "torrent/test.mp4.torrent", file_path = "file/test.mp4"):
         try:
             self.upload_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-            self.upload_socket.bind((self.ip, self.port))
+            self.upload_socket.bind(("0.0.0.0", self.port))
             self.upload_socket.listen(5)
             print(f"Listening for upload connections on ip {self.ip} port {self.port}...")
         except Exception as e:
@@ -56,7 +62,7 @@ class peer:
         for file in files:
             file_path = os.path.join("file", file)
             torrent_file_path = self.create_torrent(file_path, self.tracker_url, "torrent")
-            _, _, info_hash, _, _ = self.get_info(torrent_file_path)
+            _, _, _, info_hash, _, _ = self.get_info(torrent_file_path)
             info_hash_hex = info_hash.hex()
             self.file_info_list[info_hash_hex] = file_path
 
@@ -118,28 +124,18 @@ class peer:
     def get_info(self, torrent_file):
         with open(torrent_file, "rb") as f:
             torrent_data = bencode.decode(f.read())
-        
+        name = torrent_data["info"]["name"]
         tracker_url = torrent_data["announce"]
         length = torrent_data["info"]["length"]
         info_hash = hashlib.sha1(bencode.bencode(torrent_data['info'])).digest()
         piece_length = torrent_data['info']["piece length"]
         pieces = torrent_data["info"]["pieces"]
-        return tracker_url, length, info_hash, pieces, piece_length
+        return name, tracker_url, length, info_hash, pieces, piece_length
 
     def decode_bencode(self, bencoded_value):
 
         return bencode.decode(bencoded_value)
 
-        with open(torrent_file, "rb") as f:
-            torrent_data = bencode.decode(f.read())
-        
-        tracker_url = torrent_data["announce"]
-        length = torrent_data["info"]["length"]
-        info_hash = hashlib.sha1(bencode.bencode(torrent_data['info'])).digest()
-        piece_length = torrent_data['info']["piece length"]
-        pieces = torrent_data["info"]["pieces"]
-        return tracker_url, length, info_hash, pieces, piece_length
-    
     def get_list_piece_hashs(self, pieces):
         list_pieces = []
         for i in range(0, len(pieces), 20):
@@ -169,17 +165,6 @@ class peer:
             list_peers.append((ip, port))
         return list_peers
 
-    def handshake(self, info_hash, Ssocket, peer_id, ip, port):
-        payload = (
-            b"\x13BitTorrent protocol\x00\x00\x00\x00\x00\x00\x00\x00"
-            + info_hash
-            + peer_id.encode()
-        )
-        Ssocket.connect((ip, int(port)))
-        Ssocket.send(payload)
-        respon = Ssocket.recv(68)
-        return respon
-
     def get_piece_hashes(self, file_path, piece_length):
 
         piece_hashes = b""
@@ -207,8 +192,6 @@ class peer:
 
         list_peers = self.get_list_peers(tracker_url, info_hash, peer_id, 6881, 0, 0, length, 1)
         ip, port = list_peers[0]
-        # ip = '192.168.0.191'
-        # port = 6881
         print(ip, port)
         sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
 
@@ -230,7 +213,7 @@ class peer:
             interested_payload = struct.pack(">IB", 1, 2)
             sock.sendall(interested_payload)
             
-            sock.settimeout(10)
+            sock.settimeout(5)
             
             message = self.receive_message(sock)
             while int(message[4]) != 1:
@@ -245,29 +228,29 @@ class peer:
             num_blocks = math.ceil(piece_length / (16 * 1024))
             data = bytearray()
 
+            total_downloaded = 0
             for i in range(num_blocks):
                 block_start = 16 * 1024 * i
                 block_length = min(piece_length - block_start, 16 * 1024)
-                print(f"Requesting block {i+1} of {num_blocks} for piece {peer_index} with length {block_length}")
-
                 request_payload = struct.pack(">IBIII", 13, 6, peer_index, block_start, block_length)
                 sock.sendall(request_payload)
                 message = self.receive_message(sock)
                 data.extend(message[13:])
-            
-            print(f"Piece {peer_index} downloaded successfully.")
-            return data
+                total_downloaded += len(message[13:])
+            return data, total_downloaded
 
         finally:
-            print(f"Closing connection to peer for piece {peer_index}")
             sock.close()
 
 
 
     def download(self, torrent_file, output):
-        tracker_url, length, info_hash, pieces, piece_length = self.get_info(torrent_file)
+        name, tracker_url, length, info_hash, pieces, piece_length = self.get_info(torrent_file)
+        self.file_name = name
+        self.size = length
         piece_hashes = self.get_list_piece_hashs(pieces)
         num_pieces = len(piece_hashes)
+        downloaded = 0
 
         with open(output, "wb") as f:
             f.truncate(length)
@@ -278,7 +261,7 @@ class peer:
                 with mmap.mmap(f.fileno(), 0) as mm:
                     mm[offset:offset+len(data)] = data
 
-        with concurrent.futures.ThreadPoolExecutor(max_workers=100) as executor:
+        with concurrent.futures.ThreadPoolExecutor(max_workers=10) as executor:
             futures = {
                 executor.submit(self.download_piece, tracker_url, length, info_hash, pieces, piece_length, "01234567899876543210", i): i
                 for i in range(num_pieces)
@@ -287,10 +270,13 @@ class peer:
             for future in concurrent.futures.as_completed(futures):
                 piece_index = futures[future]
                 try:
-                    data = future.result()
+                    data, piece_size = future.result()
                     if data is not None:
+                        downloaded += piece_size
+                        self.status = (downloaded / length) * 100
+                        status = self.get_status()
+                        print(status)
                         write_piece_to_disk(data, piece_index)
-                        print(f"Piece {piece_index} stored successfully on disk.")
                     else:
                         print(f"Piece {piece_index} download failed.")
                 except Exception as e:
@@ -303,7 +289,7 @@ class peer:
 
     def upload_piece_by_piece(self, client_socket, address, torrent_file, file_path, peer_id="01234567899876543211", port=6881):
 
-        tracker_url, length, info_hash, pieces, piece_length = self.get_info(torrent_file)
+        _, tracker_url, length, info_hash, pieces, piece_length = self.get_info(torrent_file)
 
         def handle_peer_connection(client_socket, address):
             try:
@@ -366,24 +352,13 @@ class peer:
 
         handle_peer_connection(client_socket, address)
 
-    def get_piece_hashes(self, file_path, piece_length):
-
-        piece_hashes = b""
-        with open(file_path, "rb") as f:
-            while True:
-                piece = f.read(piece_length)
-                if not piece:
-                    break
-                piece_hash = hashlib.sha1(piece).digest()
-                piece_hashes += piece_hash
-        return piece_hashes
 
 
 
 if __name__ == "__main__":
 
 
-    ip = "192.168.1.9"
+    ip = "192.168.1.10"
     port = int(sys.argv[1])
     tracker = sys.argv[2].split(":")
     tracker_ip = tracker[0]
