@@ -5,7 +5,12 @@ from main import download
 from db import User, db
 import os
 import logging
-
+################################################################################
+import time
+import json
+from flask import jsonify
+import threading
+#################################################################################
 logging.basicConfig(level=logging.DEBUG)
 
 app = Flask(__name__)
@@ -121,7 +126,86 @@ def search_files(query):
     files = ["file1.txt", "file2.txt", "file3.txt"]  
     results = [file for file in files if query.lower() in file.lower()]
     return results
+#####################################################################################
+# Thêm biến global để theo dõi downloads
+downloads = {}
 
+# Thêm các route mới vào file app.py hiện tại
+@app.route('/downloads')
+@login_required
+def downloads_page():
+    return render_template('downloads.html')
+
+@app.route('/api/add-torrent', methods=['POST'])
+@login_required
+def add_torrent():
+    try:
+        torrent_file = request.files['torrent']
+        if torrent_file:
+            # Tạo thư mục để lưu file nếu chưa tồn tại
+            os.makedirs('static/torrents', exist_ok=True)
+            os.makedirs('static/downloads', exist_ok=True)
+            
+            # Lưu file torrent
+            torrent_path = os.path.join('static/torrents', torrent_file.filename)
+            torrent_file.save(torrent_path)
+            
+            # Tạo ID cho download
+            download_id = len(downloads) + 1
+            
+            # Tạo thông tin download
+            downloads[download_id] = {
+                'id': download_id,
+                'fileName': torrent_file.filename,
+                'size': os.path.getsize(torrent_path),
+                'progress': 0,
+                'status': 'starting',
+                'user_id': current_user.id
+            }
+            
+            # Bắt đầu download trong thread riêng
+            thread = threading.Thread(
+                target=start_download,
+                args=(download_id, torrent_path)
+            )
+            thread.start()
+            
+            return jsonify({'success': True, 'downloadId': download_id})
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)})
+
+@app.route('/api/downloads', methods=['GET'])
+@login_required
+def get_downloads():
+    user_downloads = {k: v for k, v in downloads.items() 
+                     if v['user_id'] == current_user.id}
+    return jsonify(list(user_downloads.values()))
+
+@app.route('/api/cancel-download/<int:download_id>', methods=['POST'])
+@login_required
+def cancel_download(download_id):
+    if download_id in downloads and downloads[download_id]['user_id'] == current_user.id:
+        downloads[download_id]['status'] = 'cancelled'
+        return jsonify({'success': True})
+    return jsonify({'success': False, 'error': 'Download not found'})
+
+def start_download(download_id, torrent_path):
+    try:
+        output_path = os.path.join('static/downloads', 
+                                  downloads[download_id]['fileName'])
+        
+        # Giả lập tiến trình download (thay thế bằng hàm download thật của bạn)
+        for i in range(101):
+            if downloads[download_id]['status'] == 'cancelled':
+                break
+            downloads[download_id]['progress'] = i
+            time.sleep(0.5)
+        
+        downloads[download_id]['status'] = 'completed'
+    except Exception as e:
+        downloads[download_id]['status'] = 'error'
+        print(f"Download error: {e}")
+##################################################################################################
 
 if __name__ == "__main__":
     with app.app_context():
