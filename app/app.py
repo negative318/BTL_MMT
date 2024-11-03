@@ -1,10 +1,19 @@
-from flask import Flask, request, render_template, redirect, url_for, send_file
+from flask import Flask, request, render_template, redirect, url_for, send_file, jsonify
 from flask_login import LoginManager, login_user, login_required, logout_user, current_user
 from werkzeug.security import generate_password_hash, check_password_hash
-from main import download
+from client import peer
 from db import User, db
 import os
 import logging
+import subprocess
+from flask_socketio import SocketIO, emit
+import socketio
+import sys
+from server import *
+from flask import json
+
+
+
 
 logging.basicConfig(level=logging.DEBUG)
 
@@ -34,7 +43,7 @@ def login():
                 logging.debug(f"User found: {user.username}")
                 if check_password_hash(user.password, password):
                     login_user(user)
-                    return redirect(url_for('index'))
+                    return redirect(url_for('getInfo'))
                 else:
                     logging.warning("Invalid password")
             else:
@@ -44,8 +53,71 @@ def login():
     except Exception as e:
         logging.error("Error in login route: %s", e)
         return "An error occurred while logging in."
-    
-    
+
+
+tracker = server()
+server_info = tracker.get_server_info()
+current_client = peer()  
+
+@app.route('/getInfo', methods=['GET', 'POST'])
+@login_required
+def getInfo():
+    print(server_info)
+    global current_client  
+    if request.method == 'POST':
+        ip = request.form['ip']
+        port = int(request.form['port'])
+        tracker_url = request.form['tracker_url']
+        tracker_ip = server_info.get("ip")
+        tracker_port = server_info.get("port")
+        try:
+            port = int(port) 
+            tracker_port = int(tracker_port)  
+            
+            logging.info(f"Client created with IP: {ip}, Port: {port}, Tracker IP: {tracker_ip}, Tracker Port: {tracker_port}")
+            #subprocess.Popen(['python', 'client.py', str(port), f"{tracker_ip}:{tracker_port}"])
+            current_client = peer(ip, port, tracker_url)
+            logging.info(f"Client started with IP: {ip}, Port: {port}, Tracker: {tracker_ip}:{tracker_port}")
+            print("Client started successfully.")
+            return redirect(url_for('uploadFile'))
+        except Exception as e:
+            logging.error("Error creating peer client: %s", e)
+            return "Failed to create peer client.", 500
+    return render_template('getInfo.html',server_info = server_info)
+
+
+current_file = []
+
+@app.route('/getFileInfo', methods=['GET', 'POST'])
+@login_required
+def getFileInfo():
+    if request.method == 'POST':
+        torrent_file = request.form['torrent_file']
+        output_file = request.form['output_file']
+        if torrent_file and output_file:
+            current_file[:] = [torrent_file, output_file]  
+            try:
+                current_client.download(torrent_file, output_file)
+                print(f"Downloading {torrent_file} to {output_file}.")
+                return redirect(url_for('index'))
+            except Exception as e:
+                logging.error("Error initiating download: %s", e)
+                return "Failed to start download.", 500
+    return render_template('getFileInfo.html')
+
+
+
+@app.route('/uploadFile', methods=['GET', 'POST'])
+@login_required
+def uploadFile():
+    if request.method == 'POST':
+        files = request.files.getlist('uploadFiles')  
+        for file in files:
+            if file and file.filename:  
+                file_path = os.path.join('file', file.filename)
+                current_client.register_files_with_tracker(file_path)
+        print("Files uploaded successfully!")  
+    return render_template('uploadFile.html')
 
 
 @app.route('/register', methods=['GET', 'POST'])
@@ -74,15 +146,30 @@ def register():
 
     return render_template('register.html')
 
+current_status = current_client.get_status()
 
 @app.route('/index', methods=['GET', 'POST'])
 @login_required
 def index():
-    search_results = []
     if request.method == 'POST':
-        search_query = request.form.get('search_query')  
-        search_results = search_files(search_query)  
-    return render_template('index.html', search_results=search_results)
+        torrent_file = request.files.get('torrent')
+
+        if torrent_file:
+            current_client.start_download(torrent_file)  
+            return jsonify(success=True)
+        
+        return jsonify(success=False, error="No torrent file provided.")
+    
+    else:  
+        download_status = current_client.get_status()  
+        download_info = {
+            "file_name": download_status.get("file_name", ""),
+            "size": download_status.get("size", 0),
+            "status": download_status.get("status", ""),
+        }
+        
+        return render_template('download.html', download_info=download_info)
+
 
 
 
@@ -97,33 +184,10 @@ def logout():
 def user_details():
     return render_template('user_details.html', user=current_user)
 
-"""
-@app.route('/connect_to_all_peers_and_download/<filename>', methods=['GET'])
-def connect_to_all_peers_and_download(filename):
-    torrent_file = os.path.join('path_to_torrent_files', filename)  # Đường dẫn tới file torrent
-    output_file = os.path.join('path_to_output_files', 'downloaded_file')  # Đường dẫn lưu file tải về
-
-    # Gọi hàm download từ main.py để tải file từ tất cả các peer
-    try:
-        success = download(torrent_file, output_file)  # Thực hiện tải xuống
-
-        if success:
-            # Trả file đã tải xuống cho người dùng
-            return send_file(output_file, as_attachment=True)
-        else:
-            return "Failed to download the file from peers.", 500
-    except Exception as e:
-        print(f"Error: {e}")
-        return "An error occurred during download.", 500
-"""
-
-def search_files(query):
-    files = ["file1.txt", "file2.txt", "file3.txt"]  
-    results = [file for file in files if query.lower() in file.lower()]
-    return results
 
 
 if __name__ == "__main__":
     with app.app_context():
         db.create_all() 
     app.run(debug=True)
+

@@ -1,0 +1,221 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Display Download</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        }
+        body {
+            background-color: #f5f5f5;
+            padding: 20px;
+        }
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            background-color: white;
+            border-radius: 10px;
+            box-shadow: 0 0 10px rgba(0,0,0,0.1);
+            padding: 20px;
+        }
+        h1 {
+            text-align: center;
+            color: #2c3e50;
+            margin-bottom: 30px;
+            padding-bottom: 15px;
+            border-bottom: 2px solid #eee;
+        }
+        .download-list {
+            width: 100%;
+            border-collapse: collapse;
+        }
+        .download-list th {
+            background-color: #4CAF50;
+            color: white;
+            padding: 12px;
+            text-align: left;
+        }
+        .download-list td {
+            padding: 12px;
+            border-bottom: 1px solid #eee;
+        }
+        .progress-container {
+            width: 100%;
+            background-color: #f1f1f1;
+            border-radius: 5px;
+            overflow: hidden;
+        }
+        .progress-bar {
+            width: 0%;
+            height: 20px;
+            background-color: #4CAF50;
+            text-align: center;
+            line-height: 20px;
+            color: white;
+            transition: width 0.3s ease;
+        }
+        .status-cell {
+            min-width: 200px;
+        }
+        .file-name {
+            color: #2c3e50;
+            font-weight: 500;
+        }
+        .add-torrent {
+            margin-bottom: 20px;
+            padding: 20px;
+            background-color: #f8f9fa;
+            border-radius: 5px;
+        }
+        .add-torrent input[type="file"] {
+            padding: 10px;
+            margin-right: 10px;
+        }
+        .add-torrent button {
+            padding: 10px 20px;
+            background-color: #2ecc71;
+            color: white;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            transition: background-color 0.3s;
+        }
+        .add-torrent button:hover {
+            background-color: #27ae60;
+        }
+        .size-column {
+            text-align: right;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Torrent Downloader</h1>
+        
+        <table class="download-list">
+            <thead>
+                <tr>
+                    <th>ID</th>
+                    <th>File Name</th>
+                    <th>Size</th>
+                    <th>Status</th>
+                </tr>
+            </thead>
+            <tbody id="downloadsList">
+                {% for status in download_statuses %}
+                    <tr>
+                        <td>{{ loop.index }}</td>
+                        <td class="file-name">{{ status.file_name }}</td>
+                        <td class="size-column">{{ formatSize(status.size) }}</td>
+                        <td class="status-cell">
+                            <div class="progress-container">
+                            </div>
+                        </td>
+
+                    </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+        
+    </div>
+    <script>
+        async function addTorrent() {
+            const fileInput = document.getElementById('torrentFile');
+            const file = fileInput.files[0];
+            
+            if (file) {
+                const formData = new FormData();
+                formData.append('torrent', file);
+                
+                try {
+                    const response = await fetch('/api/add-torrent', {
+                        method: 'POST',
+                        body: formData
+                    });
+                    const data = await response.json();
+                    
+                    if (data.success) {
+                        fileInput.value = '';
+                        updateProgress();
+                    } else {
+                        alert('Error adding torrent: ' + data.error);
+                    }
+                } catch (error) {
+                    console.error('Error:', error);
+                    alert('Error adding torrent');
+                }
+            }
+        }
+
+        async function updateProgress() {
+            try {
+                const response = await fetch('/api/downloads');
+                const downloads = await response.json();
+                updateDownloadsList(downloads);
+            } catch (error) {
+                console.error('Error updating progress:', error);
+            }
+        }
+
+        function updateDownloadsList(downloads) {
+            const downloadsList = document.getElementById('downloadsList');
+            downloadsList.innerHTML = '';
+            downloads.forEach(download => {
+                const row = document.createElement('tr');
+                row.innerHTML = `
+                    <td>${download.id}</td>
+                    <td class="file-name">${download.fileName}</td>
+                    <td class="size-column">${formatSize(download.size)}</td>
+                    <td class="status-cell">
+                        <div class="progress-container">
+                            <div class="progress-bar" style="width: ${download.progress}%">
+                                ${download.progress}%
+                            </div>
+                        </div>
+                    </td>
+                    <td>
+                        <button onclick="cancelDownload(${download.id})" 
+                                ${download.status === 'completed' ? 'disabled' : ''}>
+                            Cancel
+                        </button>
+                    </td>
+                `;
+                downloadsList.appendChild(row);
+            });
+        }
+
+        async function cancelDownload(id) {
+            try {
+                const response = await fetch(`/api/cancel-download/${id}`, {
+                    method: 'POST'
+                });
+                const data = await response.json();
+                
+                if (data.success) {
+                    updateProgress();
+                } else {
+                    alert('Error cancelling download');
+                }
+            } catch (error) {
+                console.error('Error:', error);
+                alert('Error cancelling download');
+            }
+        }
+
+        function formatSize(bytes) {
+            const sizes = ['Bytes', 'KB', 'MB', 'GB', 'TB'];
+            if (bytes === 0) return '0 Byte';
+            const i = parseInt(Math.floor(Math.log(bytes) / Math.log(1024)));
+            return Math.round(bytes / Math.pow(1024, i)) + ' ' + sizes[i];  // Removed the second parameter from Math.round
+        }
+
+        // Start periodic updates
+        setInterval(updateProgress, 1000);
+    </script>
+</body>
+</html>
