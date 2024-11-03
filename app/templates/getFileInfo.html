@@ -12,15 +12,15 @@
 </head>
 <body>
     <div id="wrapper">
-        <form action="" id="form-login" method="post">
+        <form action="{{ url_for('getFileInfo') }}" id="form-login" method="post" enctype="multipart/form-data">
             <h1 class="form-heading">Enter Information</h1>
             <div class="form-group">
                 <i class="far fa-user"></i>
-                <input type="text" name="torrent_file" class="form-input" placeholder="torrent_file" required>
+                <input type="file" name="torrent_file" class="form-input" placeholder="Select torrent file" required>
             </div>
             <div class="form-group">
                 <i class="fas fa-key"></i>
-                <input type="text" name="output_file" class="form-input" placeholder="output_file" required>
+                <input type="text" name="output_file" class="form-input" placeholder="Output file name" required>
             </div>
             <input type="submit" value="Submit" class="form-submit">
         </form>

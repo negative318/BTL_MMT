@@ -60,9 +60,9 @@ class peer:
             except Exception as e:
                 print(f"Error in handling connection: {e}")
 
-    def is_download_complete(self, info_hash_hex):
+    def is_download_complete(self, info_hash):
 
-        file_info = self.file_info_list.get(info_hash_hex)
+        file_info = self.file_info_list.get(info_hash)
         if not file_info:
             print("File info not found.")
             return False
@@ -123,8 +123,6 @@ class peer:
             except Exception as e:
                 print(f"Error connecting to tracker for disconnection: {e}")
 
-    
-
     def print_file_info_table(self):
         headers = ["Info Hash", "File Path", "Pieces Count"]
         data = [
@@ -137,9 +135,7 @@ class peer:
         ]
         
         print(tabulate(data, headers=headers, tablefmt="grid"))
-
-
-    
+ 
     def create_torrent(self, file_path, tracker_url, folder_out = "torrent", piece_length=512*1024):
     
         os.makedirs(folder_out, exist_ok=True)
@@ -186,7 +182,7 @@ class peer:
             list_pieces.append(pieces[i:i+20].hex())
         return list_pieces
 
-    def get_list_peers(self, tracker_url, info_hash, peer_id, port, uploaded, downloaded, left, compact):
+    def get_list_peers(self, tracker_url, info_hash, peer_id, uploaded, downloaded, left, compact):
 
         list_peers = []
 
@@ -237,7 +233,6 @@ class peer:
         except Exception as e:
             print(f"Error connecting to tracker for file {file_path}: {e}")
         # self.print_file_info_table()
-
 
     def get_piece_hashes(self, file_path, piece_length):
 
@@ -376,7 +371,7 @@ class peer:
         is_complete = self.is_download_complete(info_hash.hex())
         while(is_complete == False):
 
-            list_peers = self.get_list_peers(tracker_url, info_hash, self.peer_id, 6881, 0, 0, length, 1)
+            list_peers = self.get_list_peers(tracker_url, info_hash, self.peer_id, 0, 0, length, 1)
             num_workers = min(self.max_worker, len(list_peers))
             with concurrent.futures.ThreadPoolExecutor(num_workers) as executor:
                 

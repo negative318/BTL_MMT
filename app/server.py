@@ -31,10 +31,10 @@ class server:
 
         print(tabulate(data, headers=headers, tablefmt="grid"))
 
-    def handle_inform(self, first_line):
+    def handle_inform(self, request_peer):
 
         print("event=started")
-        path = first_line.split(" ")[1]
+        path = request_peer.split(" ")[1]
         query_params = urllib.parse.parse_qs(urllib.parse.urlparse(path).query)
         ip = query_params.get("ip", [""])[0]
         port = int(query_params.get("port", [0])[0])
@@ -61,9 +61,9 @@ class server:
         return response
     
     
-    def handle_end(self,first_line):
+    def handle_end(self,request_peer):
         print("event=end")
-        path = first_line.split(" ")[1]
+        path = request_peer.split(" ")[1]
         query_params = urllib.parse.parse_qs(urllib.parse.urlparse(path).query)
 
         ip = query_params.get("ip", [""])[0]
@@ -95,8 +95,8 @@ class server:
         )
         return response
 
-    def handle_get_peer(self, first_line):
-        path = first_line.split(" ")[1]
+    def handle_get_peer(self, request_peer):
+        path = request_peer.split(" ")[1]
 
         query_params = urllib.parse.parse_qs(urllib.parse.urlparse(path).query)
 
@@ -131,18 +131,18 @@ class server:
     def handle_client(self, client_socket, addr):
         try:
             request = client_socket.recv(1024).decode()
-            first_line = request.splitlines()[0]
-            if 'event=started' in first_line:
-                response = self.handle_inform(first_line)
+            request_peer = request.splitlines()[0]
+            if 'event=started' in request_peer:
+                response = self.handle_inform(request_peer)
                 self.print_peers_table()
                 client_socket.sendall(response)
 
-            elif 'event=end' in first_line:
-                response = self.handle_end(first_line)
+            elif 'event=end' in request_peer:
+                response = self.handle_end(request_peer)
                 self.print_peers_table()
                 client_socket.sendall(response)
             else:
-                response = self.handle_get_peer(first_line)
+                response = self.handle_get_peer(request_peer)
 
                 print("response", response)
                 client_socket.sendall(

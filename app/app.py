@@ -60,6 +60,10 @@ server_info = tracker.get_server_info()
 current_client = None
 current_status = None
 
+
+
+
+
 @app.route('/getInfo', methods=['GET', 'POST'])
 @login_required
 def getInfo():
@@ -69,16 +73,11 @@ def getInfo():
         ip = request.form['ip']
         port = int(request.form['port'])
         tracker_url = request.form['tracker_url']
-        tracker_ip = server_info.get("ip")
-        tracker_port = server_info.get("port")
         try:
-            port = int(port) 
-            tracker_port = int(tracker_port)  
-            
-            logging.info(f"Client created with IP: {ip}, Port: {port}, Tracker IP: {tracker_ip}, Tracker Port: {tracker_port}")
+            #logging.info(f"Client created with IP: {ip}, Port: {port}, Tracker IP: {tracker_ip}, Tracker Port: {tracker_port}")
             #subprocess.Popen(['python', 'client.py', str(port), f"{tracker_ip}:{tracker_port}"])
             current_client = peer(ip, port, tracker_url)
-            logging.info(f"Client started with IP: {ip}, Port: {port}, Tracker: {tracker_ip}:{tracker_port}")
+            #logging.info(f"Client started with IP: {ip}, Port: {port}, Tracker: {tracker_ip}:{tracker_port}")
             print("Client started successfully.")
             return redirect(url_for('uploadFile'))
         except Exception as e:
@@ -89,16 +88,51 @@ def getInfo():
 
 current_file = []
 
+"""
+@app.route('/getFileInfo', methods=['POST', 'GET'])
+def getFileInfo():
+    global current_client
+    # Kiểm tra nếu đối tượng current_client đã tồn tại
+    if not current_client:
+        error = "Peer client is not initialized"
+        return render_template('getFileInfo.html', error=error)
+    
+    # Kiểm tra phương thức yêu cầu
+    if request.method == 'POST':
+        # Lấy thông tin từ request
+        torrent_file = request.form.get('torrent_file')
+        output_file = request.form.get('output_file')
+        
+        # Gọi phương thức download của đối tượng current_client
+        try:
+            download_status = current_client.download(torrent_file, output_file)
+            if download_status:
+                message = "Download complete"
+                return render_template('getFileInfo.html', message=message)
+            else:
+                error = "Download failed"
+                return render_template('getFileInfo.html', error=error)
+        except Exception as e:
+            error = f"Download error: {e}"
+            return render_template('getFileInfo.html', error=error)
+    
+    # Nếu là GET request, chỉ render template mà không xử lý gì
+    return render_template('getFileInfo.html')
+"""
+
+
 @app.route('/getFileInfo', methods=['GET', 'POST'])
 @login_required
 def getFileInfo():
     if request.method == 'POST':
-        torrent_file = request.form['torrent_file']
+        torrent_file = request.files['torrent_file']  # Thay đổi ở đây
         output_file = request.form['output_file']
         if torrent_file and output_file:
             current_file[:] = [torrent_file, output_file]  
+            torrent_file_path = os.path.join('torrent', torrent_file.filename)
             try:
-                current_client.download(torrent_file, output_file)
+                torrent_file.save(torrent_file_path)  # Lưu tệp tải lên vào thư mục
+                current_client.download(torrent_file_path, output_file)
                 print(f"Downloading {torrent_file} to {output_file}.")
                 return redirect(url_for('index'))
             except Exception as e:
@@ -107,7 +141,7 @@ def getFileInfo():
     return render_template('getFileInfo.html')
 
 
-
+"""
 @app.route('/uploadFile', methods=['GET', 'POST'])
 @login_required
 def uploadFile():
@@ -118,6 +152,32 @@ def uploadFile():
                 file_path = os.path.join('file', file.filename)
                 current_client.register_files_with_tracker(file_path)
         print("Files uploaded successfully!")  
+    return render_template('uploadFile.html')
+"""
+
+@app.route('/uploadFile', methods=['GET', 'POST'])
+@login_required
+def uploadFile():
+    global current_client
+    if not current_client:
+        error = "Peer client is not initialized"
+        return render_template('uploadFile.html', error=error)
+
+    if request.method == 'POST':
+        files = request.files.getlist('uploadFiles')
+        for file in files:
+            if file and file.filename:
+                file_path = os.path.join('file', file.filename)
+                try:
+                    current_client.register_files_with_tracker(file_path)
+                    logging.info(f"Registered file: {file_path}")
+                except Exception as e:
+                    logging.error(f"Error registering file: {file_path}, error: {e}")
+                    return render_template('uploadFile.html', error=f"Error registering file: {file_path}")
+                
+        message = "Files uploaded successfully!"
+        return render_template('uploadFile.html', message=message)
+
     return render_template('uploadFile.html')
 
 
