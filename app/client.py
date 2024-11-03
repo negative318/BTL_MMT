@@ -484,7 +484,7 @@ if __name__ == "__main__":
 
     try:
         ip = "192.168.1.10"
-        with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as s:
+        with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
             s.connect(("8.8.8.8", 80))
             ip = s.getsockname()[0]
         port = int(sys.argv[1])
