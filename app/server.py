@@ -13,6 +13,13 @@ from tabulate import tabulate
 class server:
     def __init__(self):
         self.peers = {}
+        with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as s:
+            s.connect(("8.8.8.8", 80))
+            self.server_ip = s.getsockname()[0]
+        self.server_port = 6881
+        
+    def get_server_info(self):
+        return {"ip": self.server_ip, "port": self.server_port}
 
     def print_peers_table(self):
         headers = ["Info Hash", "IP", "Port", "Peer ID"]

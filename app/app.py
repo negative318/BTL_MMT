@@ -57,7 +57,8 @@ def login():
 
 tracker = server()
 server_info = tracker.get_server_info()
-current_client = peer()  
+current_client = None
+current_status = None
 
 @app.route('/getInfo', methods=['GET', 'POST'])
 @login_required
@@ -146,29 +147,15 @@ def register():
 
     return render_template('register.html')
 
-current_status = current_client.get_status()
+
 
 @app.route('/index', methods=['GET', 'POST'])
 @login_required
 def index():
     if request.method == 'POST':
-        torrent_file = request.files.get('torrent')
-
-        if torrent_file:
-            current_client.start_download(torrent_file)  
-            return jsonify(success=True)
+        current_status = current_client.get_status()
         
-        return jsonify(success=False, error="No torrent file provided.")
-    
-    else:  
-        download_status = current_client.get_status()  
-        download_info = {
-            "file_name": download_status.get("file_name", ""),
-            "size": download_status.get("size", 0),
-            "status": download_status.get("status", ""),
-        }
-        
-        return render_template('download.html', download_info=download_info)
+        return render_template('download.html', current_status=current_status)
 
 
 
