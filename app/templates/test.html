@@ -1,0 +1,26 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Status Updates</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.0.0/socket.io.js"></script>
+    <script type="text/javascript">
+        var socket = io.connect('http://' + document.domain + ':' + location.port);
+
+        socket.on('status_update', function(data) {
+            document.getElementById('ip').innerText = "IP: " + data.ip;
+            document.getElementById('port').innerText = "Port: " + data.port;
+            document.getElementById('file_name').innerText = "File Name: " + data.file_name;
+            document.getElementById('size').innerText = "Size: " + data.size;
+            document.getElementById('status').innerText = "Status: " + data.status;
+        });
+    </script>
+</head>
+<body>
+    <h1>Download Status</h1>
+    <p id="ip">IP: </p>
+    <p id="port">Port: </p>
+    <p id="file_name">File Name: </p>
+    <p id="size">Size: </p>
+    <p id="status">Status: </p>
+</body>
+</html>

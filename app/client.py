@@ -36,14 +36,14 @@ class peer:
         return seeding_files
     
     def get_status(self):
-        status = f"ip: {self.ip}, port: {self.port}, file_name: {self.file_name}, size: {self.size}, status: {self.status: .2f}%"
-        return status
-        # return self.ip, self.port, self.file_name, self.size, self.status
+        # status = f"ip: {self.ip}, port: {self.port}, file_name: {self.file_name}, size: {self.size}, status: {self.status: .2f}%"
+        # return status
+        return self.ip, self.port, self.file_name, self.size, self.status
 
     def start_upload_listener(self):
         try:
             self.upload_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-            self.upload_socket.bind(("0.0.0.0", self.port))
+            self.upload_socket.bind((self.ip, self.port))
             self.upload_socket.listen(5)
             print(f"Listening for upload connections on ip {self.ip} port {self.port}...")
         except Exception as e:
@@ -182,7 +182,7 @@ class peer:
             list_pieces.append(pieces[i:i+20].hex())
         return list_pieces
 
-    def get_list_peers(self, tracker_url, info_hash, peer_id, uploaded, downloaded, left, compact):
+    def get_list_peers(self, tracker_url, info_hash, peer_id, port, uploaded, downloaded, left, compact):
 
         list_peers = []
 
@@ -371,7 +371,7 @@ class peer:
         is_complete = self.is_download_complete(info_hash.hex())
         while(is_complete == False):
 
-            list_peers = self.get_list_peers(tracker_url, info_hash, self.peer_id, 0, 0, length, 1)
+            list_peers = self.get_list_peers(tracker_url, info_hash, self.peer_id, 6881, 0, 0, length, 1)
             num_workers = min(self.max_worker, len(list_peers))
             with concurrent.futures.ThreadPoolExecutor(num_workers) as executor:
                 
@@ -389,8 +389,8 @@ class peer:
                         if data is not None:
                             downloaded += piece_size
                             self.status = (downloaded / length) * 100
-                            status = self.get_status()
-                            print(status)
+                            ip, port, file_name, size, status = self.get_status()
+                            print(f"ip: {ip}, port: {port}, file_name: {file_name}, size: {size}, status: {status: .2f}%")
                             write_piece_to_disk(data, piece_index)
                         else:
                             print(f"Piece {piece_index} download failed.")
@@ -484,7 +484,7 @@ if __name__ == "__main__":
 
     try:
         ip = "192.168.1.10"
-        with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
+        with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as s:
             s.connect(("8.8.8.8", 80))
             ip = s.getsockname()[0]
         port = int(sys.argv[1])
@@ -515,4 +515,3 @@ if __name__ == "__main__":
                     client.download(torrent_file, output)
     finally:
         client.disconnect_from_tracker()
-

@@ -11,6 +11,8 @@ import socketio
 import sys
 from server import *
 from flask import json
+import threading
+import time
 
 
 
@@ -212,10 +214,12 @@ def register():
 @app.route('/index', methods=['GET', 'POST'])
 @login_required
 def index():
-    if request.method == 'POST':
-        current_status = current_client.get_status()
+    if request.method == 'GET':
+        while(True):
+                ip, port, file_name, size, status = current_client.get_status()
+            
         
-        return render_template('download.html', current_status=current_status)
+        return render_template('download.html', ip=ip, port)
 
 
 
