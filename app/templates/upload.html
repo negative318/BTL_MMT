@@ -72,13 +72,6 @@
             </thead>
             <tbody id="downloadsList">
                 <!-- Nội dung sẽ được cập nhật từ JavaScript -->
-                <tr>
-                    <td id="ip">N/A</td>
-                    <td id="port">N/A</td>
-                    <td id="file_name">N/A</td>
-                    <td id="size">N/A</td>
-                    <td id="status">N/A</td>
-                </tr>
             </tbody>
         </table>
     </div>
@@ -87,13 +80,34 @@
     <script type="text/javascript">
         var socket = io.connect('http://' + document.domain + ':' + location.port + '/upload');
 
+        // Map để lưu trữ các file đang tải lên
+        const files = new Map();
+
+        // Hàm xử lý sự kiện 'status_update' để cập nhật danh sách file
         socket.on('status_update', function(data) {
-            document.getElementById('ip').innerText = data.ip || "N/A";
-            document.getElementById('port').innerText = data.port || "N/A";
-            document.getElementById('file_name').innerText = data.file_name || "N/A";
-            document.getElementById('size').innerText = formatSize(data.size) || "N/A";
-            document.getElementById('status').innerText = data.progress || "N/A";
+            const fileKey = `${data.ip}:${data.port}-${data.file_name}`;
+            files.set(fileKey, data); // Lưu hoặc cập nhật thông tin file trong Map
+
+            renderDownloadsList(); // Render lại danh sách file sau mỗi cập nhật
         });
+
+        // Hàm render danh sách file
+        function renderDownloadsList() {
+            const downloadsList = document.getElementById("downloadsList");
+            downloadsList.innerHTML = ''; // Xóa nội dung cũ
+
+            files.forEach((data) => {
+                const row = document.createElement('tr');
+                row.innerHTML = `
+                    <td>${data.ip || "N/A"}</td>
+                    <td>${data.port || "N/A"}</td>
+                    <td class="file-name">${data.file_name || "N/A"}</td>
+                    <td class="size-column">${formatSize(data.size) || "N/A"}</td>
+                    <td>${data.progress || "N/A"}</td>
+                `;
+                downloadsList.appendChild(row);
+            });
+        }
 
         // Định dạng kích thước file
         function formatSize(bytes) {
@@ -103,6 +117,5 @@
             return Math.round(bytes / Math.pow(1024, i)) + ' ' + sizes[i];
         }
     </script>
-
 </body>
 </html>

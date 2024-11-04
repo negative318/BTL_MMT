@@ -21,8 +21,9 @@ logging.basicConfig(level=logging.DEBUG)
 app = Flask(__name__)
 #app.config['UPLOAD_FOLDER'] = 'static/downloads'
 app.config['SECRET_KEY'] = 'secret_key'
-app.config['SQLALCHEMY_DATABASE_URI'] = 'mysql://root:123456789@localhost/p2p' 
-db.init_app(app)
+# app.config['SQLALCHEMY_DATABASE_URI'] = 'mysql://root:123456789@localhost/p2p' 
+app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///:memory:'
+# db.init_app(app)
 socketio = SocketIO(app)
 login_manager = LoginManager()
 login_manager.init_app(app)
@@ -67,7 +68,7 @@ current_status = None
 
 
 @app.route('/getInfo', methods=['GET', 'POST'])
-@login_required
+# @login_required
 def getInfo():
     print(server_info)
     global current_client  
@@ -124,7 +125,7 @@ def getFileInfo():
 
 
 @app.route('/getFileInfo', methods=['GET', 'POST'])
-@login_required
+# @login_required
 def getFileInfo():
     if request.method == 'POST':
         torrent_file = request.files['torrent_file']  # Thay đổi ở đây
@@ -145,7 +146,7 @@ def getFileInfo():
 
 """
 @app.route('/uploadFile', methods=['GET', 'POST'])
-@login_required
+# @login_required
 def uploadFile():
     if request.method == 'POST':
         files = request.files.getlist('uploadFiles')  
@@ -158,7 +159,7 @@ def uploadFile():
 """
 
 @app.route('/uploadFile', methods=['GET', 'POST'])
-@login_required
+# @login_required
 def uploadFile():
     global current_client
     if not current_client:
@@ -247,12 +248,11 @@ def handle_upload_connect():
         while True:
             if current_client:
                 try:
-                    seeding_files = current_client.get_seeding()  # Lấy danh sách các tệp seeding
+                    seeding_files = current_client.get_seeding()
                     for ip, port, file_name, size in seeding_files:
-                        status = "Seeding"  # Thiết lập trạng thái là "Seeding"
+                        status = "Seeding"
                         print('Uploading:', ip, port, file_name, size)
                         
-                        # Gửi thông tin từng tệp seeding đến client
                         socketio.emit('status_update', {
                             'ip': ip,
                             'port': port,
@@ -261,14 +261,13 @@ def handle_upload_connect():
                             'progress': status
                         }, namespace='/upload')
 
-                    time.sleep(2)  # Gửi dữ liệu mỗi 2 giây
+                    time.sleep(2)
                 except Exception as e:
                     logging.error("Error while getting upload status: %s", e)
                     break
 
-    # Khởi chạy luồng riêng cho tiến độ tải lên
     upload_thread = threading.Thread(target=send_file_upload)
-    upload_thread.daemon = True  # Đặt luồng là daemon để tự động dừng khi ứng dụng dừng
+    upload_thread.daemon = True
     upload_thread.start()
 
 
@@ -285,13 +284,13 @@ def upload():
 
 
 @app.route('/logout')
-@login_required
+# @login_required
 def logout():
     logout_user()
     return redirect(url_for('login'))
 
 @app.route('/user_details')
-@login_required
+# @login_required
 def user_details():
     return render_template('user_details.html', user=current_user)
 
