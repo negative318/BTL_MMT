@@ -91,10 +91,9 @@
             renderDownloadsList(); // Render lại danh sách file sau mỗi cập nhật
         });
 
-        // Hàm render danh sách file
         function renderDownloadsList() {
             const downloadsList = document.getElementById("downloadsList");
-            downloadsList.innerHTML = ''; // Xóa nội dung cũ
+            downloadsList.innerHTML = '';
 
             files.forEach((data) => {
                 const row = document.createElement('tr');

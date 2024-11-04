@@ -56,8 +56,9 @@
             background-color: #4CAF50;
             text-align: center;
             line-height: 20px;
-            color: white;
+            color: black; /* Đổi màu chữ thành đen */
             transition: width 0.3s ease;
+            font-weight: bold; /* Font chữ dày hơn */
         }
         .status-cell {
             min-width: 200px;
@@ -118,7 +119,8 @@
 
             // Cập nhật thanh tiến độ
             const progressBar = document.getElementById('progress-bar');
-            const progress = data.progress !== undefined ? data.progress : 0;  // Đặt mặc định là 0 nếu không có `progress`
+            let progress = data.progress !== undefined ? data.progress : 0;  // Đặt mặc định là 0 nếu không có `progress`
+            progress = Math.round(progress * 100) / 100;  // Làm tròn đến 2 chữ số
             progressBar.style.width = progress + '%';
             progressBar.innerText = progress + '%';
         });

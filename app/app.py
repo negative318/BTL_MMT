@@ -67,7 +67,7 @@ current_status = None
 
 
 @app.route('/getInfo', methods=['GET', 'POST'])
-@login_required
+# @login_required
 def getInfo():
     print(server_info)
     global current_client  
@@ -124,7 +124,7 @@ def getFileInfo():
 
 
 @app.route('/getFileInfo', methods=['GET', 'POST'])
-@login_required
+# @login_required
 def getFileInfo():
     if request.method == 'POST':
         torrent_file = request.files['torrent_file']  # Thay đổi ở đây
@@ -145,7 +145,7 @@ def getFileInfo():
 
 """
 @app.route('/uploadFile', methods=['GET', 'POST'])
-@login_required
+# @login_required
 def uploadFile():
     if request.method == 'POST':
         files = request.files.getlist('uploadFiles')  
@@ -158,7 +158,7 @@ def uploadFile():
 """
 
 @app.route('/uploadFile', methods=['GET', 'POST'])
-@login_required
+# @login_required
 def uploadFile():
     global current_client
     if not current_client:
@@ -285,13 +285,13 @@ def upload():
 
 
 @app.route('/logout')
-@login_required
+# @login_required
 def logout():
     logout_user()
     return redirect(url_for('login'))
 
 @app.route('/user_details')
-@login_required
+# @login_required
 def user_details():
     return render_template('user_details.html', user=current_user)
 
@@ -302,3 +302,4 @@ if __name__ == "__main__":
         db.create_all() 
     #app.run(debug=True)
     socketio.run(app, debug=True)
+
