@@ -1,0 +1,108 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Torrent Downloader</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        }
+        body {
+            background-color: #f5f5f5;
+            padding: 20px;
+        }
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            background-color: white;
+            border-radius: 10px;
+            box-shadow: 0 0 10px rgba(0,0,0,0.1);
+            padding: 20px;
+        }
+        h1 {
+            text-align: center;
+            color: #2c3e50;
+            margin-bottom: 30px;
+            padding-bottom: 15px;
+            border-bottom: 2px solid #eee;
+        }
+        .download-list {
+            width: 100%;
+            border-collapse: collapse;
+        }
+        .download-list th {
+            background-color: #4CAF50;
+            color: white;
+            padding: 12px;
+            text-align: left;
+        }
+        .download-list td {
+            padding: 12px;
+            border-bottom: 1px solid #eee;
+        }
+        .status-cell {
+            min-width: 200px;
+        }
+        .file-name {
+            color: #2c3e50;
+            font-weight: 500;
+        }
+        .size-column {
+            text-align: right;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Torrent Downloader</h1>
+        
+        <table class="download-list">
+            <thead>
+                <tr>
+                    <th>IP</th>
+                    <th>Port</th>
+                    <th>File Name</th>
+                    <th>Size</th>
+                    <th>Status</th>
+                </tr>
+            </thead>
+            <tbody id="downloadsList">
+                <!-- Nội dung sẽ được cập nhật từ JavaScript -->
+                <tr>
+                    <td id="ip">N/A</td>
+                    <td id="port">N/A</td>
+                    <td id="file_name">N/A</td>
+                    <td id="size">N/A</td>
+                    <td id="status">N/A</td>
+                </tr>
+            </tbody>
+        </table>
+    </div>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.0.0/socket.io.js"></script>
+    <script type="text/javascript">
+        var socket = io.connect('http://' + document.domain + ':' + location.port + '/upload');
+
+        socket.on('status_update', function(data) {
+            document.getElementById('ip').innerText = data.ip || "N/A";
+            document.getElementById('port').innerText = data.port || "N/A";
+            document.getElementById('file_name').innerText = data.file_name || "N/A";
+            document.getElementById('size').innerText = formatSize(data.size) || "N/A";
+            document.getElementById('status').innerText = data.progress || "N/A";
+        });
+
+        // Định dạng kích thước file
+        function formatSize(bytes) {
+            const sizes = ['Bytes', 'KB', 'MB', 'GB', 'TB'];
+            if (bytes === 0) return '0 Byte';
+            const i = parseInt(Math.floor(Math.log(bytes) / Math.log(1024)));
+            return Math.round(bytes / Math.pow(1024, i)) + ' ' + sizes[i];
+        }
+    </script>
+
+</body>
+</html>

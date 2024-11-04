@@ -16,7 +16,6 @@ import time
 
 
 
-
 logging.basicConfig(level=logging.DEBUG)
 
 app = Flask(__name__)
@@ -24,6 +23,7 @@ app = Flask(__name__)
 app.config['SECRET_KEY'] = 'secret_key'
 app.config['SQLALCHEMY_DATABASE_URI'] = 'mysql://root:123456789@localhost/p2p' 
 db.init_app(app)
+socketio = SocketIO(app)
 login_manager = LoginManager()
 login_manager.init_app(app)
 
@@ -136,7 +136,7 @@ def getFileInfo():
                 torrent_file.save(torrent_file_path)  # Lưu tệp tải lên vào thư mục
                 current_client.download(torrent_file_path, output_file)
                 print(f"Downloading {torrent_file} to {output_file}.")
-                return redirect(url_for('index'))
+                return redirect(url_for('download'))
             except Exception as e:
                 logging.error("Error initiating download: %s", e)
                 return "Failed to start download.", 500
@@ -209,18 +209,78 @@ def register():
 
     return render_template('register.html')
 
+@socketio.on('connect', namespace='/download')
+def handle_download_connect():
+    def send_status_updates():
+        while True:
+            if current_client:
+                try:
+                    # Lấy thông tin về tiến độ tải xuống
+                    ip, port, file_name, size, status = current_client.get_status()
+                    
+                    # Đảm bảo `status` là phần trăm nếu cần thiết
+                    if isinstance(status, float) and status <= 1:
+                        status = int(status * 100)  # Chuyển đổi thành phần trăm nếu là số thập phân
+
+                    # Gửi dữ liệu đến client
+                    socketio.emit('status_update', {
+                        'ip': ip,
+                        'port': port,
+                        'file_name': file_name,
+                        'size': size,
+                        'progress': status  # Đổi tên thành 'progress' để đồng nhất với HTML
+                    }, namespace='/download')  # Thêm namespace cho sự kiện
+                    time.sleep(2)  # Gửi dữ liệu mỗi 2 giây
+                except Exception as e:
+                    logging.error("Error while getting status: %s", e)
+                    break
+
+    # Khởi chạy luồng riêng để gửi dữ liệu
+    thread = threading.Thread(target=send_status_updates)
+    thread.daemon = True  # Đặt luồng là daemon để nó tự động dừng khi ứng dụng dừng
+    thread.start()
 
 
-@app.route('/index', methods=['GET', 'POST'])
-@login_required
-def index():
-    if request.method == 'GET':
-        while(True):
-                ip, port, file_name, size, status = current_client.get_status()
-            
-        
-        return render_template('download.html', ip=ip, port)
+@socketio.on('connect', namespace='/upload')
+def handle_upload_connect():
+    def send_file_upload():
+        while True:
+            if current_client:
+                try:
+                    seeding_files = current_client.get_seeding()  # Lấy danh sách các tệp seeding
+                    for ip, port, file_name, size in seeding_files:
+                        status = "Seeding"  # Thiết lập trạng thái là "Seeding"
+                        print('Uploading:', ip, port, file_name, size)
+                        
+                        # Gửi thông tin từng tệp seeding đến client
+                        socketio.emit('status_update', {
+                            'ip': ip,
+                            'port': port,
+                            'file_name': file_name,
+                            'size': size,
+                            'progress': status
+                        }, namespace='/upload')
 
+                    time.sleep(2)  # Gửi dữ liệu mỗi 2 giây
+                except Exception as e:
+                    logging.error("Error while getting upload status: %s", e)
+                    break
+
+    # Khởi chạy luồng riêng cho tiến độ tải lên
+    upload_thread = threading.Thread(target=send_file_upload)
+    upload_thread.daemon = True  # Đặt luồng là daemon để tự động dừng khi ứng dụng dừng
+    upload_thread.start()
+
+
+
+@app.route('/download', methods= ["GET"])
+def download():
+    return render_template('download.html')
+
+
+@app.route('/upload', methods = ["GET"])
+def upload():
+    return render_template('upload.html')
 
 
 
@@ -240,5 +300,6 @@ def user_details():
 if __name__ == "__main__":
     with app.app_context():
         db.create_all() 
-    app.run(debug=True)
+    #app.run(debug=True)
+    socketio.run(app, debug=True)
 

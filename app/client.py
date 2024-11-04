@@ -32,7 +32,9 @@ class peer:
     def get_seeding(self):
         seeding_files = []
         for info_hash, info in self.file_info_list.items():
-            seeding_files.append(info["file_path"])
+            file_name = os.path.basename(info["file_path"])
+            size = os.path.getsize(info["file_path"])
+            seeding_files.append((self.ip, self.port, file_name, size))
         return seeding_files
     
     def get_status(self):
@@ -502,6 +504,8 @@ if __name__ == "__main__":
                 for i in range(1, num_file):
                     print(parts[i])
                     client.register_files_with_tracker(parts[i])
+                print(client.get_seeding())
+            elif "get_seeding" in user_input:
                 print(client.get_seeding())
             elif "download" in user_input:
                 parts = user_input.split(maxsplit=2)
