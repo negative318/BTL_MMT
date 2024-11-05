@@ -1,0 +1,133 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="stylesheet" href="{{ url_for('static', filename='test.css') }}">
+    <link rel="stylesheet" href="https://pro.fontawesome.com/releases/v5.10.0/css/all.css">
+ 
+    <title>Login Page</title>
+    <style>
+        body {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            margin: 0;
+            background-color: #121212;
+            font-family: Arial, sans-serif;
+        }
+
+        #wrapper {
+            width: 100%;
+            max-width: 400px;
+            padding: 20px;
+            border-radius: 10px;
+            background-color: #333333;
+            box-shadow: 0px 4px 8px rgba(0, 0, 0, 0.5);
+            color: #f0f0f0;
+            text-align: center;
+        }
+
+        .form-heading {
+            font-size: 24px;
+            font-weight: bold;
+            color: #ffffff;
+            margin-bottom: 20px;
+        }
+
+        .form-group {
+            position: relative;
+            margin-bottom: 20px;
+        }
+
+        .form-group i {
+            position: absolute;
+            top: 50%;
+            left: 10px;
+            transform: translateY(-50%);
+            color: #ffffff;
+        }
+
+        .form-input {
+            width: 100%;
+            padding: 10px 10px 10px 30px;
+            border: 1px solid #555555;
+            border-radius: 5px;
+            background-color: #222222;
+            color: #ffffff;
+            font-size: 16px;
+        }
+
+        .form-input::placeholder {
+            color: #888888;
+        }
+
+        .form-submit {
+            width: 100%;
+            padding: 10px;
+            font-size: 16px;
+            font-weight: bold;
+            border: none;
+            border-radius: 5px;
+            color: #ffffff;
+            background-color: #007bff;
+            cursor: pointer;
+            transition: background-color 0.3s;
+        }
+
+        .form-submit:hover {
+            background-color: #0056b3;
+        }
+
+        .form-register {
+            display: inline-block;
+            margin-top: 15px;
+            padding: 10px 20px;
+            font-size: 16px;
+            font-weight: bold;
+            color: #ffffff;
+            background-color: #28a745;
+            border-radius: 5px;
+            text-decoration: none;
+            transition: background-color 0.3s;
+        }
+
+        .form-register:hover {
+            background-color: #218838;
+        }
+
+        #eye {
+            position: absolute;
+            top: 50%;
+            right: 10px;
+            transform: translateY(-50%);
+            color: #ffffff;
+            cursor: pointer;
+        }
+    </style>
+</head>
+<body>
+    <div id="wrapper">
+        <form action="" id="form-login" method="post">
+            <h1 class="form-heading">LOGIN</h1>
+            <div class="form-group">
+                <i class="far fa-user"></i>
+                <input type="text" name="username" class="form-input" placeholder="Username">
+            </div>
+            <div class="form-group">
+                <i class="fas fa-key"></i>
+                <input type="password" name="password" class="form-input" placeholder="Password">
+                <div id="eye">
+                    <i class="far fa-eye"></i>
+                </div>
+            </div>
+            <input type="submit" value="Login" class="form-submit">
+            <a href="{{ url_for('register') }}" class="form-register">Register</a>
+        </form>
+    </div>
+</body>
+<script src="https://code.jquery.com/jquery-3.6.0.js"></script>
+<script src="{{ url_for('static', filename='script/test.js') }}"></script>
+</html>

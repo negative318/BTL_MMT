@@ -1,0 +1,128 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="stylesheet" href="{{ url_for('static', filename='test.css') }}">
+    <link rel="stylesheet" href="https://pro.fontawesome.com/releases/v5.10.0/css/all.css">
+    <title>Upload File Information Page</title>
+    <style>
+        body {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            margin: 0;
+            background-color: #121212;
+            font-family: Arial, sans-serif;
+        }
+
+        #wrapper {
+            width: 100%;
+            max-width: 400px;
+            padding: 20px;
+            border-radius: 10px;
+            background-color: #333333;
+            box-shadow: 0px 4px 8px rgba(0, 0, 0, 0.5);
+            color: #f0f0f0;
+            text-align: center;
+        }
+
+        .form-heading {
+            font-size: 24px;
+            font-weight: bold;
+            color: #ffffff;
+            margin-bottom: 20px;
+        }
+
+        .form-group {
+            position: relative;
+            margin-bottom: 20px;
+        }
+
+        .form-group i {
+            position: absolute;
+            top: 50%;
+            left: 10px;
+            transform: translateY(-50%);
+            color: #ffffff;
+        }
+
+        .form-input {
+            width: 100%;
+            padding: 10px 10px 10px 30px;
+            border: 1px solid #555555;
+            border-radius: 5px;
+            background-color: #222222;
+            color: #ffffff;
+            font-size: 16px;
+        }
+
+        .form-input::placeholder {
+            color: #888888;
+        }
+
+        .form-input[type="file"] {
+            padding-left: 5px;
+        }
+
+        .form-submit, .form-next, .form-exit {
+            width: 100%;
+            padding: 10px;
+            font-size: 16px;
+            font-weight: bold;
+            border: none;
+            border-radius: 5px;
+            color: #ffffff;
+            cursor: pointer;
+            transition: background-color 0.3s;
+            margin-top: 10px;
+            text-align: center;
+            display: inline-block;
+            text-decoration: none;
+        }
+
+        .form-submit {
+            background-color: #007bff;
+        }
+
+        .form-submit:hover {
+            background-color: #0056b3;
+        }
+
+        .form-next {
+            background-color: #28a745;
+        }
+
+        .form-next:hover {
+            background-color: #218838;
+        }
+
+        .form-exit {
+            background-color: #dc3545;
+        }
+
+        .form-exit:hover {
+            background-color: #c82333;
+        }
+    </style>
+</head>
+<body>
+    <div id="wrapper">
+        <form action="{{ url_for('uploadFile') }}" id="form-upload" method="post" enctype="multipart/form-data">
+            <h1 class="form-heading">Upload Files</h1>
+            <div class="form-group">
+                <i class="fas fa-upload"></i>
+                <input type="file" name="uploadFiles" class="form-input" multiple required>
+            </div>
+            <a href="javascript:;" onclick="document.getElementById('form-upload').submit()" class="form-submit">Submit</a>
+            <a href="{{ url_for('getFileInfo') }}" class="form-next">Next</a>
+            <a href="{{ url_for('upload') }}" class="form-next">See Uploading</a>
+            <a href="{{ url_for('exit') }}" class="form-exit">Exit</a>
+        </form>
+    </div>
+</body>
+<script src="https://code.jquery.com/jquery-3.6.0.js"></script>
+<script src="{{ url_for('static', filename='script/test.js') }}"></script>
+</html>

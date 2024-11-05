@@ -1,0 +1,67 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="stylesheet" href="reset.css">
+    <link rel="stylesheet" href="{{ url_for('static', filename='test.css') }}">
+    <link rel="stylesheet" href="https://pro.fontawesome.com/releases/v5.10.0/css/all.css">
+ 
+    <title>Get File Information Page</title>
+    <style>
+        /* General button styles */
+        .form-button {
+            display: inline-block;
+            width: 100%; /* Set width to match other buttons */
+            padding: 10px;
+            margin-top: 10px;
+            font-size: 16px;
+            font-weight: bold;
+            color: white;
+            background-color: #007bff;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            text-align: center;
+            text-decoration: none; /* Remove underline for "View Download" link */
+        }
+
+        .form-button:hover {
+            background-color: #0056b3;
+        }
+
+        /* Align "Exit" and "View Download" buttons side-by-side */
+        .form-actions {
+            display: flex;
+            gap: 10px;
+        }
+
+        .form-actions .form-button {
+            flex: 1;
+        }
+    </style>
+</head>
+<body>
+    <div id="wrapper">
+        <form action="{{ url_for('getFileInfo') }}" id="form-login" method="post" enctype="multipart/form-data">
+            <h1 class="form-heading">Enter Information</h1>
+            <div class="form-group">
+                <i class="far fa-user"></i>
+                <input type="file" name="torrent_file" class="form-input" placeholder="Select torrent file" required>
+            </div>
+            <div class="form-group">
+                <i class="fas fa-key"></i>
+                <input type="text" name="output_file" class="form-input" placeholder="Output file name" required>
+            </div>
+            <input type="submit" value="Submit" class="form-button">
+            <div class="form-actions">
+                <a href="/download" class="form-button">View Download</a>
+                <a href="/exit" class="form-button">Exit</a> <!-- Thay đổi thành liên kết điều hướng đến /exit -->
+            </div>
+        </form>
+    </div>
+</body>
+<script src="https://code.jquery.com/jquery-3.6.0.js"></script>
+<script src="{{ url_for('static', filename='script/test.js') }}"></script>
+</html>
