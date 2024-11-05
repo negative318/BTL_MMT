@@ -216,7 +216,7 @@ class peer:
         num_pieces = math.ceil(length / piece_length)
         self.file_info_list[info_hash_hex] = {
             "file_path": file_path,
-            "pieces": [False] * num_pieces
+            "pieces": [True] * num_pieces
         }
 
         params = {
@@ -236,6 +236,19 @@ class peer:
             print(f"Error connecting to tracker for file {file_path}: {e}")
         # self.print_file_info_table()
 
+
+    def add_to_seeding1(self, file_path, info_hash, piece_length= 512*1024):
+
+        length = os.path.getsize(file_path)
+        info_hash_bytes = urllib.parse.unquote_to_bytes(info_hash)
+        info_hash_hex = info_hash_bytes.hex()
+        num_pieces = math.ceil(length / piece_length)
+        self.file_info_list[info_hash_hex] = {
+            "file_path": file_path,
+            "pieces": [False] * num_pieces
+        }
+
+    
     def get_piece_hashes(self, file_path, piece_length):
 
         piece_hashes = b""
@@ -361,7 +374,7 @@ class peer:
         with open(output, "wb") as f:
             f.truncate(length)
 
-        self.add_to_seeding(output, info_hash)
+        self.add_to_seeding1(output, info_hash)
 
         def write_piece_to_disk(data, piece_index):
                 offset = piece_index * piece_length
@@ -401,6 +414,7 @@ class peer:
                         print(f"Error writing piece {piece_index}: {e}")
             is_complete = self.is_download_complete(info_hash.hex())
         print("Download complete.")
+        self.add_to_seeding(output, info_hash)
         return True
 
 
@@ -475,7 +489,7 @@ class peer:
             except Exception as e:
                 print(f"Error with peer {address}: {e}")
             finally:
-                client_socket.close()
+                # client_socket.close()
                 print(f"Connection with peer {address} closed")
 
         handle_peer_connection(client_socket, address)
