@@ -238,8 +238,9 @@ def handle_download_connect():
                     logging.error("Error while getting status: %s", e)
                     break
 
+    # Khởi chạy luồng riêng để gửi dữ liệu
     thread = threading.Thread(target=send_status_updates)
-    thread.daemon = True
+    thread.daemon = True  # Đặt luồng là daemon để nó tự động dừng khi ứng dụng dừng
     thread.start()
 
 
@@ -249,11 +250,12 @@ def handle_upload_connect():
         while True:
             if current_client:
                 try:
-                    seeding_files = current_client.get_seeding()
+                    seeding_files = current_client.get_seeding()  # Lấy danh sách các tệp seeding
                     for ip, port, file_name, size in seeding_files:
-                        status = "Seeding"
+                        status = "Seeding"  # Thiết lập trạng thái là "Seeding"
                         print('Uploading:', ip, port, file_name, size)
                         
+                        # Gửi thông tin từng tệp seeding đến client
                         socketio.emit('status_update', {
                             'ip': ip,
                             'port': port,
